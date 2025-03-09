@@ -1,4 +1,11 @@
 flask
 pandas
 numpy
+matplotlib
+scikit-optimize
+torch
+sklearn.preprocessing
+keras
 tensorflow
+keras-tuner
+keras-preprocessing
