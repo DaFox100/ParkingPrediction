@@ -72,13 +72,13 @@ def Create_logger():
                                 ('37.320913786693346, -121.8653592200895')]  # end
 
     # return the average traffic velocity in from the chordinate pairs given 
-    def get_traffic_density(chord_matrix):
-        # distance and velocity calculations from https://github.com/edgargutgzz/sanpedro_trafficdata
-        response = gmaps.distance_matrix(chord_matrix[0],chord_matrix[1], departure_time = "now")
-        distance = (response['rows'][0]['elements'][0]['distance']['value']/1000)
-        duration_traffic = (response['rows'][0]['elements'][0]['duration_in_traffic']['value']) / 60
-        velocity = (distance / duration_traffic) * 60
-        return velocity 
+    # def get_traffic_density(chord_matrix):
+    #     # distance and velocity calculations from https://github.com/edgargutgzz/sanpedro_trafficdata
+    #     response = gmaps.distance_matrix(chord_matrix[0],chord_matrix[1], departure_time = "now")
+    #     distance = (response['rows'][0]['elements'][0]['distance']['value']/1000)
+    #     duration_traffic = (response['rows'][0]['elements'][0]['duration_in_traffic']['value']) / 60
+    #     velocity = (distance / duration_traffic) * 60
+    #     return velocity
 
 
     # get the PAGE request and store it in page
