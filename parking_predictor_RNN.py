@@ -3,11 +3,11 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
-import keras as k 
+import keras as k
 
-from keras.layers import Dense, LSTM
-from keras.models import Sequential
-from keras import backend as K
+from keras.api.layers import Dense, LSTM
+from keras.api.models import Sequential
+
 
 # read the csv using panda
 df = pd.read_csv('log.csv',index_col='date',parse_dates=True)
@@ -28,7 +28,7 @@ scaler.fit(train)
 scaled_train = scaler.transform(train)
 scaled_test = scaler.transform(test)
 
-from keras.preprocessing.sequence import TimeseriesGenerator
+from keras_preprocessing.sequence import TimeseriesGenerator
 n_input = 32 # previous data inputs are used in next prediction
 n_features = 1 # number of data outputs forecast 
 generator = TimeseriesGenerator(scaled_train, scaled_train, length=n_input, batch_size=1)
