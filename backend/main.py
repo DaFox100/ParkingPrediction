@@ -25,12 +25,10 @@ class DataPoint(BaseModel):
 @app.get("/api/data", response_model=List[DataPoint])
 async def get_data():
     # Generate sample data for the last 24 hours
-    now = datetime.now()
     data = []
 
-    for i in range(24):
-        time_point = now - timedelta(hours=23 - i) # Create time points for each hour
-        time_str = time_point.strftime("%H:%M") # Format as HH:MM
+    for hour in range(1,25):
+        time_str = f"{hour:02d}:00"
         value = random.randint(0, 100)  # Random value between 0-100
 
         data.append({
