@@ -1,38 +1,31 @@
-.App {
-  text-align: center;
+/* Dark theme stuff */
+.app-container-dark {
+    width: 80%;
+    margin: 0 auto;
+    padding: 20px;
+    min-height: 100vh;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+/* Height of bar chart */
+.chart-container {
+    height: 500px;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+/* Distance from the bar chart */
+.data-list {
+    margin-top: 20px;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+/* ul = unordered list.
+Removed the dots from list */
+.data-list ul {
+  list-style-type: none;
+  padding: 0;
 }
 
-.App-link {
-  color: #61dafb;
-}
-
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* li = list item
+Margin between each item
+ */
+.data-list li {
+  margin-bottom: 8px;
 }
