@@ -99,7 +99,7 @@ function App() {
         }, scales: {
             x: {
                 ticks: {
-                    color: themeColors.text, fontSize: 14, align: 'end',
+                    color: themeColors.text, fontSize: 14, align: 'start',
                 }, grid: {
                     color: themeColors.grid, offset: true,
                 },

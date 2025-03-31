@@ -69,16 +69,16 @@ async def get_data(date: str = None,  # Expect YYYY-MM-DD format
     for result in results:
         time_str = result.timestamp.strftime("%H:%M")
         value = result.North_status * 100
-        hour = (int(time_str[:2])) % 24  # Get hour
-        # if hour == 0:
-        #     hour = 24
+        hour = (int(time_str[:2]) + 1) % 24  # Get next hour
+        if hour == 0:
+            hour = 24
         hour_str = f"{hour:02d}:00"
         hourly_sums[hour_str][0] += value
         hourly_sums[hour_str][1] += 1
 
     # Construct tuples and append for every hour, calculate sums   Every 11:00 get averaged
     averaged_result = []
-    for hour in range(0,24):
+    for hour in range(1,25):
         hour_str = f"{hour:02d}:00"
         total, count = hourly_sums[hour_str]
         avg_value = int(total / count if count > 0 else 0)
