@@ -71,54 +71,43 @@ function App() {
         setSelectedDate(e.target.value);
     }
 
+    // const labels = ["00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", "08:00", "09:00",
+    //     "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00",
+    //     "22:00", "23:00"];
+
 
     const chartData = {
-        labels: data.map(item => item.time),
-        datasets: [
-            {
-                label: 'Value',
-                data: data.map(item => item.value),
-                backgroundColor: themeColors.bg,
-                borderColor: themeColors.border,
-                borderWidth: 1,
-            },
-        ],
+        labels: data.map(item => item.time), datasets: [{
+            label: 'Value',
+            data: data.map(item => item.value),
+            backgroundColor: themeColors.bg,
+            borderColor: themeColors.border,
+            borderWidth: 1,
+        },],
     };
 
     // Misc elements such as legend, title, etc
     const options = {
-        responsive: true,
-        plugins: {
+        responsive: true, plugins: {
             legend: {
-                position: 'top',
-                labels: {
+                position: 'top', labels: {
                     color: themeColors.text,
                 },
+            }, title: {
+                display: true, text: '24-Hour Data Values (0-100)', color: themeColors.text,
             },
-            title: {
-                display: true,
-                text: '24-Hour Data Values (0-100)',
-                color: themeColors.text,
-            },
-        },
-        scales: {
+        }, scales: {
             x: {
                 ticks: {
-                    color: themeColors.text,
-                    fontSize: 14,
+                    color: themeColors.text, fontSize: 14, align: 'end',
+                }, grid: {
+                    color: themeColors.grid, offset: true,
                 },
-                grid: {
-                    color: themeColors.grid,
-                },
-            },
-            y: {
-                beginAtZero: true,
-                max: 100,
-                ticks: {
-                    color: themeColors.text,
-                    fontSize: 14,
-                },
-                grid: {
+
+            }, y: {
+                beginAtZero: true, max: 100, ticks: {
+                    color: themeColors.text, fontSize: 14,
+                }, grid: {
                     color: themeColors.grid,
                 },
             },
@@ -135,20 +124,17 @@ function App() {
     }
 
     // Return the chart and data list when data is loaded and ready to display
-    return (
-        <div className="app-container-dark">
+    return (<div className="app-container-dark">
             <h1>24-Hour Data Visualization</h1>
 
             <div className="date-selector">
                 <select value={selectedDate} onChange={handleDateChange} disabled={loading}>
-                    {availableDates.map(date =>(
-                        <option key={date} value={date}>
+                    {availableDates.map(date => (<option key={date} value={date}>
                             {date}
-                        </option>
-                    ))}
+                        </option>))}
                 </select>
 
-                <button onClick={() => fetchDataForDate(selectedDate)} disabled={loading} >
+                <button onClick={() => fetchDataForDate(selectedDate)} disabled={loading}>
                     {loading ? 'Loading...' : 'Refresh Data'}
                 </button>
             </div>
@@ -160,15 +146,12 @@ function App() {
             <div className="data-list">
                 <h3>Data Points:</h3>
                 <ul>
-                    {data.map((item, index) => (
-                        <li key={index}>
+                    {data.map((item, index) => (<li key={index}>
                             Time: {item.time}, Value: {item.value}
-                        </li>
-                    ))}
+                        </li>))}
                 </ul>
             </div>
-        </div>
-    );
+        </div>);
 }
 
 export default App;
