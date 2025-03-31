@@ -1,37 +1,31 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-import random
-from datetime import datetime, timedelta
-from pydantic import BaseModel
-from typing import List
+
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+from models import Datapoints, get_db
+from datetime import datetime
 
 app = FastAPI()
 
 # Enable CORS
-# app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"],
-#                    allow_headers=["*"], )
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"],
+                   allow_headers=["*"], )
 
 
-class DataPoint(BaseModel):
-    time: str
-    value: int
+# TODO Separate DB stuff into a different file
 
 
-@app.get("/api/data", response_model=List[DataPoint])
-async def get_data():
-    # Generate sample data for the last 24 hours
-    data = []
+@app.get("/api/data")
+async def get_data(date: str = None, db: Session = Depends(get_db)):
+    query = db.query(Datapoints)
 
-    for hour in range(1, 25):
-        time_str = f"{hour:02d}:00"
-        value = random.randint(0, 100)  # Random value between 0-100
+    if not date:
+        return None
 
-        data.append({
-            "time": time_str,
-            "value": value
-        })
-
-    return data
+    query = query.filter(func.Date(Datapoints.timestamp == date))
+    print(query.order_by(Datapoints.timestamp).all())
+    return None
 
 
 if __name__ == "__main__":
