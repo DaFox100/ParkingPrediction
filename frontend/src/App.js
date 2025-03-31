@@ -16,30 +16,61 @@ function App() {
         text: getCssVariable('--text-color').trim() || '#ffffff',
         grid: getCssVariable('--grid-color').trim() || 'rgba(255, 255, 255, 0.1)',
         border: getCssVariable('--chart-border').trim() || 'rgba(54, 162, 235, 1)',
-        bg: getCssVariable('--chart-bg').trim() || 'rgba(75, 192, 192, 0.5)'
+        bg: getCssVariable('--chart-bg').trim() || 'rgba(54, 162, 235, 0.5)'
     };
 
 
     // State value, and function that sets the state
     const [data, setData] = useState([]); // Sets this to be a list
     const [loading, setLoading] = useState(true); // Set this to be a bool
+    const [availableDates, setAvailableDates] = useState([]);
+    const [selectedDate, setSelectedDate] = useState('');
+    const [isFetchingDates, setIsFetchingDates] = useState(true);
 
-    // React hook for side effects. Second argument is [], meaning this will only run once when mounted
+    // Get available dates from dedicates API endpoint
     useEffect(() => {
-        const fetchData = async () => {
+        const fetchAvailableDates = async () => {
             try {
-                const response = await fetch('http://localhost:8000/api/data');
-                const jsonData = await response.json();
-                setData(jsonData);
-                setLoading(false);
+                const response = await fetch('http://localhost:8000/api/dates')
+                const dates = await response.json();
+                setAvailableDates(dates);
+                if (dates.length > 0) {
+                    setSelectedDate(dates[0]);
+                }
+                setIsFetchingDates(false);
+
             } catch (error) {
-                console.error('Error fetching data:', error);
-                setLoading(false);
+                console.error('Error fetching dates:', error);
+                setIsFetchingDates(false);
             }
         };
 
-        fetchData();
+        fetchAvailableDates();
     }, []);
+
+    // Whenever selectedDate changes, fetch data
+    useEffect(() => {
+        if (selectedDate) {
+            fetchDataForDate(selectedDate);
+        }
+    }, [selectedDate]);
+
+    const fetchDataForDate = async (date) => {
+        setLoading(true);
+        try {
+            const response = await fetch(`http://localhost:8000/api/data?date=${date}`);
+            const jsonData = await response.json();
+            setData(jsonData);
+        } catch (error) {
+            console.error('Error fetching data:', error);
+        }
+        setLoading(false);
+    }
+
+    const handleDateChange = (e) => {
+        setSelectedDate(e.target.value);
+    }
+
 
     const chartData = {
         labels: data.map(item => item.time),
@@ -94,6 +125,10 @@ function App() {
         },
     };
 
+    if (isFetchingDates) {
+        return <div className="loading-text">Loading available dates...</div>;
+    }
+
     // Return text while data is loading
     if (loading) {
         return <div className="loading-text"> Loading data...</div>;
@@ -103,6 +138,21 @@ function App() {
     return (
         <div className="app-container-dark">
             <h1>24-Hour Data Visualization</h1>
+
+            <div className="date-selector">
+                <select value={selectedDate} onChange={handleDateChange} disabled={loading}>
+                    {availableDates.map(date =>(
+                        <option key={date} value={date}>
+                            {date}
+                        </option>
+                    ))}
+                </select>
+
+                <button onClick={() => fetchDataForDate(selectedDate)} disabled={loading} >
+                    {loading ? 'Loading...' : 'Refresh Data'}
+                </button>
+            </div>
+
             <div className="chart-container">
                 {/* Chart that displays Bar graph */}
                 <Bar data={chartData} options={options}/>
