@@ -1,9 +1,11 @@
 from motor.motor_asyncio import AsyncIOMotorClient
-from datetime import datetime
-from typing import List, Dict, Any
+from datetime import datetime, date
+from typing import List, Dict, Any, Optional
 from pathlib import Path
 from dotenv import load_dotenv
 import os
+import asyncio
+from pydantic import BaseModel
 
 load_dotenv()
 
@@ -15,6 +17,14 @@ client = AsyncIOMotorClient(MONGO_URI)
 db = client[DATABASE_NAME]
 
 AVAILABLE_DATES = []
+
+class Datapoint(BaseModel):
+    timestamp: datetime
+    metadata: str
+    south_status: int
+    west_status: int
+    north_status: int
+    south_campus_status: int
 
 async def init_db():
     """Initialize the database and create time series collection if it doesn't exist"""
@@ -33,8 +43,6 @@ async def init_db():
             )
             # Create index on timestamp
             await db.datapoints.create_index([("timestamp", 1)])
-            # Create index on date field for faster queries
-            await db.datapoints.create_index([("date", 1)])
     except Exception as e:
         print(f"Error initializing database: {e}")
 
@@ -68,6 +76,27 @@ async def init_available_dates():
 async def get_available_dates() -> List[str]:
     
     return AVAILABLE_DATES
+
+async def get_datapoint(timestamp: datetime) -> Datapoint:
+    collection = db["datapoints"]
+    query = {"timestamp": timestamp}
+    datapoint = await collection.find_one(query)
+    return Datapoint(**datapoint)
+
+
+async def insert_datapoint(data: Datapoint):
+    """
+    Insert a new datapoint into the time series collection
+    
+    Args:
+        data (Datapoint): Datapoint object containing the datapoint information
+    """
+    collection = db["datapoints"]
+    await collection.insert_one(data.model_dump())
+
+async def close_connection():
+    """Close the MongoDB connection"""
+    client.close()
 
 async def get_hourly_data(date: str) -> List[Dict[str, Any]]:
     """
@@ -143,22 +172,21 @@ async def get_hourly_data(date: str) -> List[Dict[str, Any]]:
     
     return formatted_results
 
-async def insert_datapoint(data: Dict[str, Any]):
-    """
-    Insert a new datapoint into the time series collection
-    
-    Args:
-        data (Dict[str, Any]): Dictionary containing the datapoint information
-    """
 
-    # TODO This does not insert metadata
+# if __name__ == "__main__":
+#     async def main():
+#         await init_db()
+#         time = datetime.now()
+#         datapoint = Datapoint(
+#             timestamp=time,
+#             metadata="test",
+#             north_status=100,
+#             south_status=100,
+#             west_status=100,
+#             south_campus_status=100
+#         )
+#         await insert_datapoint(datapoint)
+#         print(await get_datapoint(time))
+#         await close_connection()
 
-    collection = db["datapoints"]
-    # Add date field for easier querying
-    data["date"] = data["timestamp"].date()
-    await collection.insert_one(data)
-
-async def close_connection():
-    """Close the MongoDB connection"""
-    client.close()
-
+#     asyncio.run(main())
