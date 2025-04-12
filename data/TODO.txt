@@ -1,0 +1,13 @@
+Use binary data for everything
+
+Janauary = True/False 0/1
+Feb = True/False
+etc
+
+Don't make values sequential - data should be normalized and not passed in order
+
+Figure out how to pass days in
+Just date? Or a parameter for each day?
+
+Numerical data only
+one model for each garage.
