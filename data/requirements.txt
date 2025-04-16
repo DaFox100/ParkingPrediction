@@ -1,0 +1,12 @@
+config==0.5.1
+keras==3.9.2
+keras_preprocessing==1.1.2
+matplotlib==3.10.1
+numpy==2.2.4
+pandas==2.2.3
+Requests==2.32.3
+scikit_learn==1.6.1
+SQLAlchemy==2.0.40
+tensorflow==2.19.0
+torch==2.6.0
+urllib3==2.4.0
