@@ -9,8 +9,15 @@ export interface GarageData {
   hourlyData: HourlyData[]
 }
 
+// Should correspond to the data returned by the backend /backend/routes/data.py "DataResponse"
+export interface RawDataPoint {
+  time: string
+  value: number
+}
+
 export interface HourlyData {
   time: string
   occupancy: number
   forecast?: boolean
+  rawData?: RawDataPoint[]
 }

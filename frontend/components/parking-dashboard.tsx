@@ -2,23 +2,39 @@
 
 import { useState, useEffect } from "react"
 import ParkingGarageCard from "@/components/parking-garage-card"
-import { getParkingData } from "@/lib/data"
+import { getParkingData, getAvailableDates } from "@/lib/data"
 import type { GarageData } from "@/lib/types"
 
 export default function ParkingDashboard() {
   const [parkingData, setParkingData] = useState<GarageData[]>([])
   const [expandedGarageId, setExpandedGarageId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [selectedDate, setSelectedDate] = useState<string>("")
+  const [availableDates, setAvailableDates] = useState<string[]>([])
+
+  useEffect(() => {
+    async function loadDates() {
+      const dates = await getAvailableDates()
+      setAvailableDates(dates)
+      if (dates.length > 0) {
+        setSelectedDate(dates[dates.length - 1]) // Set to latest date by default
+      }
+    }
+    loadDates()
+  }, [])
 
   useEffect(() => {
     async function loadData() {
-      const data = await getParkingData()
-      setParkingData(data)
-      setLoading(false)
+      if (selectedDate) {
+        setLoading(true)
+        const data = await getParkingData(selectedDate)
+        setParkingData(data)
+        setLoading(false)
+      }
     }
 
     loadData()
-  }, [])
+  }, [selectedDate])
 
   const handleGarageClick = (id: string) => {
     setExpandedGarageId(expandedGarageId === id ? null : id)
@@ -26,7 +42,7 @@ export default function ParkingDashboard() {
 
   const handleRefresh = async () => {
     setLoading(true)
-    const data = await getParkingData()
+    const data = await getParkingData(selectedDate)
     setParkingData(data)
     setLoading(false)
   }
@@ -48,6 +64,8 @@ export default function ParkingDashboard() {
           isExpanded={expandedGarageId === garage.id}
           onGarageClick={handleGarageClick}
           onRefresh={handleRefresh}
+          selectedDate={selectedDate}
+          onDateChange={setSelectedDate}
         />
       ))}
     </div>

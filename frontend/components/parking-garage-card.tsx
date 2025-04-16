@@ -1,19 +1,39 @@
 "use client"
 import { RefreshCw, Calendar } from "lucide-react"
+import { useState, useEffect } from "react"
 import type { GarageData } from "@/lib/types"
 import TrendChart from "./trend-chart"
 import DetailedGarageChart from "./detailed-garage-chart"
 import { formatDate } from "@/lib/utils"
+import { getAvailableDates } from "@/lib/data"
 
 interface ParkingGarageCardProps {
   garage: GarageData
   isExpanded: boolean
   onGarageClick: (id: string) => void
   onRefresh: () => void
+  selectedDate: string
+  onDateChange: (date: string) => void
 }
 
-export default function ParkingGarageCard({ garage, isExpanded, onGarageClick, onRefresh }: ParkingGarageCardProps) {
+export default function ParkingGarageCard({ 
+  garage, 
+  isExpanded, 
+  onGarageClick, 
+  onRefresh,
+  selectedDate,
+  onDateChange
+}: ParkingGarageCardProps) {
   const { id, name, currentOccupancy, trend, trendDirection, nextHour } = garage
+  const [availableDates, setAvailableDates] = useState<string[]>([])
+
+  useEffect(() => {
+    async function loadDates() {
+      const dates = await getAvailableDates()
+      setAvailableDates(dates)
+    }
+    loadDates()
+  }, [])
 
   return (
     <div
@@ -54,7 +74,17 @@ export default function ParkingGarageCard({ garage, isExpanded, onGarageClick, o
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 text-gray-400">
                 <Calendar size={18} />
-                <span>{formatDate(new Date())}</span>
+                <select
+                  className="bg-[#1a1d24] text-gray-400 border border-[#333842] rounded px-2 py-1"
+                  value={selectedDate}
+                  onChange={(e) => onDateChange(e.target.value)}
+                >
+                  {availableDates.map((date) => (
+                    <option key={date} value={date}>
+                      {formatDate(new Date(date))}
+                    </option>
+                  ))}
+                </select>
               </div>
               <button
                 className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"

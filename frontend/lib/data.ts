@@ -1,59 +1,92 @@
-import type { GarageData } from "./types"
+import type { GarageData, RawDataPoint, HourlyData } from "./types"
 
-// Mock data - in a real app, this would come from your API
-export async function getParkingData(): Promise<GarageData[]> {
-  // Simulate API call
-  await new Promise((resolve) => setTimeout(resolve, 500))
+// Get parking data from the API
+export async function getParkingData(date?: string): Promise<GarageData[]> {
+  const selectedDate = date || new Date().toISOString().split('T')[0]
+  const garages = ['north', 'west', 'south', 'south_campus']
+  const names = ['North', 'West', 'South', 'SouthCampus']
+  
+  const garageDataPromises = garages.map(async (id) => {
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/data?date=${selectedDate}&garage_id=${id}`)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch data for ${id}`)
+      }
+      const data = await response.json()
+      
+      // Convert hourly values to the format expected by the frontend
+      const hourlyData = data.hourly_values.map((value: number | null, index: number) => ({
+        time: `${index.toString().padStart(2, '0')}:00`,
+        occupancy: value || 0,
+        forecast: false,
+        rawData: data.raw_data.filter((point: RawDataPoint) => 
+          point.time.startsWith(`${index.toString().padStart(2, '0')}:`)
+        )
+      }))
+      
+      // Calculate current occupancy and trend
+      const currentHour = new Date().getHours()
+      const currentHourStr = currentHour.toString().padStart(2, '0') + ':00'
+      const currentData = hourlyData.find((d: HourlyData) => d.time === currentHourStr)
+      const nextHourData = hourlyData.find((d: HourlyData) => d.time === 
+        ((currentHour + 1) % 24).toString().padStart(2, '0') + ':00'
+      )
+      
+      const currentOccupancy = currentData?.occupancy || 0
+      const trend = nextHourData ? nextHourData.occupancy - currentOccupancy : 0
+      
+      return {
+        id,
+        name: names[garages.indexOf(id)],
+        currentOccupancy,
+        trend: Math.abs(trend),
+        trendDirection: trend >= 0 ? "up" as const : "down" as const,
+        nextHour: nextHourData?.time || "00:00",
+        trendData: generateTrendData(currentOccupancy, trend),
+        hourlyData
+      }
+    } catch (error) {
+      console.error(`Error fetching data for ${id}:`, error)
+      // Return mock data if API fails
+      return {
+        id,
+        name: names[garages.indexOf(id)],
+        currentOccupancy: 50,
+        trend: 0,
+        trendDirection: "up" as const,
+        nextHour: "00:00",
+        trendData: generateTrendData(50, 0),
+        hourlyData: []
+      }
+    }
+  })
 
-  return [
-    {
-      id: "north",
-      name: "North",
-      currentOccupancy: 69,
-      trend: 15,
-      trendDirection: "down",
-      nextHour: "5PM",
-      trendData: generateTrendData(69, -15),
-      hourlyData: generateHourlyData("north"),
-    },
-    {
-      id: "west",
-      name: "West",
-      currentOccupancy: 34,
-      trend: 3,
-      trendDirection: "up",
-      nextHour: "5PM",
-      trendData: generateTrendData(34, 3),
-      hourlyData: generateHourlyData("west"),
-    },
-    {
-      id: "south",
-      name: "South",
-      currentOccupancy: 81,
-      trend: 24,
-      trendDirection: "down",
-      nextHour: "5PM",
-      trendData: generateTrendData(81, -24),
-      hourlyData: generateHourlyData("south"),
-    },
-    {
-      id: "southcampus",
-      name: "SouthCampus",
-      currentOccupancy: 21,
-      trend: 20,
-      trendDirection: "down",
-      nextHour: "23:00",
-      trendData: generateTrendData(21, -20),
-      hourlyData: generateHourlyData("southcampus"),
-    },
-  ]
+  return Promise.all(garageDataPromises)
 }
 
+// Get garage data by ID from the API
 export async function getGarageById(id: string): Promise<GarageData | undefined> {
   const garages = await getParkingData()
   return garages.find((garage) => garage.id === id)
 }
 
+
+// Get available dates from the API
+export async function getAvailableDates(): Promise<string[]> {
+  try {
+    const response = await fetch('http://127.0.0.1:8000/api/dates')
+    if (!response.ok) {
+      throw new Error('Failed to fetch available dates')
+    }
+    return await response.json()
+  } catch (error) {
+    console.error('Error fetching available dates:', error)
+    // Return today's date as fallback
+    return [new Date().toISOString().split('T')[0]]
+  }
+}
+
+// Generate mock trend data
 function generateTrendData(current: number, trend: number) {
   const points = 10
   const data = []
@@ -81,56 +114,4 @@ function generateTrendData(current: number, trend: number) {
   }
 
   return data
-}
-
-function generateHourlyData(garageId: string) {
-  const hours = [
-    "00:00",
-    "01:00",
-    "02:00",
-    "03:00",
-    "04:00",
-    "05:00",
-    "06:00",
-    "07:00",
-    "08:00",
-    "09:00",
-    "10:00",
-    "11:00",
-    "12:00",
-    "13:00",
-    "14:00",
-    "15:00",
-    "16:00",
-    "17:00",
-    "18:00",
-    "19:00",
-    "20:00",
-    "21:00",
-    "22:00",
-    "23:00",
-  ]
-
-  // Different patterns for different garages
-  const patterns = {
-    north: [2, 3, 5, 12, 40, 60, 75, 85, 87, 80, 75, 70, 60, 45, 40, 25, 15, 5],
-    west: [5, 7, 10, 15, 25, 30, 32, 34, 38, 35, 30, 28, 25, 20, 15, 10, 8, 5],
-    south: [3, 5, 8, 20, 45, 65, 75, 81, 78, 75, 70, 65, 55, 45, 35, 25, 15, 5],
-    southcampus: [1, 2, 3, 5, 10, 15, 18, 20, 21, 19, 17, 15, 12, 10, 8, 5, 3, 1],
-  }
-
-  const pattern = patterns[garageId as keyof typeof patterns] || patterns.north
-  const currentHour = new Date().getHours()
-
-  return hours.map((time, index) => {
-    // Use pattern for first 18 hours, then zeros for remaining hours
-    const occupancy = index < pattern.length ? pattern[index] : 0
-
-    return {
-      time,
-      occupancy,
-      // Mark as forecast for future hours
-      forecast: index > currentHour,
-    }
-  })
 }
