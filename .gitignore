@@ -1,31 +1,34 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/frontend/node_modules
+**/node_modules
 
 # next.js
-/frontend/.next/
-/frontend/components/ui/
+**/.next/
+**/components/ui/
 
 
 # production
-/build
+**/build
 
 # debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
 
 # env files
-.env*
+**/.env*
 
 # vercel
-.vercel
+**/.vercel
 
 # typescript
-*.tsbuildinfo
-next-env.d.ts
+**/.tsbuildinfo
+**/.next-env.d.ts
 
 # python
-/__pycache__
+**/__pycache__/
+
+.cursorignore
+TODO.txt
