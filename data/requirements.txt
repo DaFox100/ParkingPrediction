@@ -1,13 +1,10 @@
-flask
 pandas
 numpy
 matplotlib
 scikit-optimize
-torch
 sklearn.preprocessing
 keras
 tensorflow
-keras-tuner
 keras-preprocessing
 
 # model downloads for these hyperparameters:  https://drive.google.com/drive/folders/1M-IWseAn_hjiwQUDIvP4SV1f6R5w-n6T?usp=sharing
