@@ -113,16 +113,17 @@ for garage_no, garage in enumerate(garage_names,start=0):
 def main():
     # not parrallelizable, not threadsafe :C thanks keras 
     for index, garage in enumerate(garage_names,start=0):
+        print(f"training long model: {garage}")
         if long_training_mask[index]:
             train_long_model(
             model=long_garage_models[index],
-            training_epochs=25,
-            batch_size=64,
+            training_epochs=35,
+            batch_size=32,
             future_steps=long_future_steps,
             test_split=0.8,
             seq_size=long_seq,
             name=f"long_model_{garage}")
-
+        print(f"training short model: {garage}")
         if short_training_mask[index]:
             train_short_model(
             model=short_garage_models[index],
@@ -132,6 +133,7 @@ def main():
             test_split=0.8,
             seq_size=short_seq,
             name=f"short_model_{garage}")
+
 
     prediction = make_prediction()
     plot_prediction(prediction)
