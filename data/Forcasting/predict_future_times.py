@@ -7,6 +7,11 @@ from keras_model_file import build_model
 from short_term_model import train_short_model
 from long_term_model import train_long_model
 
+from constants import (
+    MODEL_DIRECTORY,
+    LOGS_DIRECTORY
+)
+
 # Flags to control training
 enable_train_short = True
 enable_train_long = True
@@ -14,13 +19,11 @@ enable_time_encoding = True
 enable_instr_day = True
 enable_instr_next_day = True
 
-garage_names = ["south","west","north","south_campus"]
-model_folder = "keras_models"
-logs_directory = "data/Records"
+
 
 extra_long_data = 0
 # Load and preprocess log.csv data
-data = pd.read_csv(f"{logs_directory}/log.csv")
+data = pd.read_csv(f"{LOGS_DIRECTORY}/log.csv")
 data = data[-1000:] # WHY IS THIS NESSESSARY TO WORK, I DON'T KNOW
 data = data.drop(columns=["Unnamed: 0", "south density", "west density", "north density", "south compus density"])
 
@@ -29,7 +32,7 @@ short_data = data.drop(columns=["date"]).copy()
 
 # Load the instruction days CSV and prepare it
 if enable_instr_day:
-    instruction_days_df = pd.read_csv(f"{logs_directory}/sjsu_instruction_days.csv")
+    instruction_days_df = pd.read_csv(f"{LOGS_DIRECTORY}/sjsu_instruction_days.csv")
     instruction_days_df["Date"] = pd.to_datetime(instruction_days_df["Date"]).dt.date
     instruction_days_df.rename(columns={"Instruction_Day": "instruction_day"}, inplace=True)
     # Prepare the log data
@@ -137,8 +140,8 @@ def make_prediction():
     
     # Load weights if available
     try: 
-        long_garage_model.load_weights(f"{model_folder}/long_model.weights.h5")
-        short_garage_model.load_weights(f"{model_folder}/short_model.weights.h5")
+        long_garage_model.load_weights(f"{MODEL_DIRECTORY}/long_model.weights.h5")
+        short_garage_model.load_weights(f"{MODEL_DIRECTORY}/short_model.weights.h5")
     except Exception as e:
         print("Could not load weights, please verify you have existing weight files, exiting.")
         exit(-1)

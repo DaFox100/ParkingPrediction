@@ -2,12 +2,12 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.losses import Loss
 
-logs_directory = "data/Records"
-model_directory = "data/Forcasting/keras_models"
-garage_names = ["south", "west", "north", "south campus"]
+from constants import (
+    MODEL_DIRECTORY
+)
 
 # ── CUSTOM LOSS CLASS ───────────────────────────────────────────────────────────
-class CustomMSESingleGarage(Loss):
+class _CustomMSESingleGarage(Loss):
     def __init__(self, garage_no, name="custom_mse_first_four"):
         super().__init__(name=name)
         self.garage_no = garage_no
@@ -19,7 +19,7 @@ class CustomMSESingleGarage(Loss):
 
 reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=5, min_lr=1e-7, verbose=1)
 
-def CustomMSEFour(y_true,y_pred):
+def _CustomMSEFour(y_true,y_pred):
     y_true_slice = y_true[:, :, :4]
     y_pred_slice = y_pred[:, :, :4]
     return tf.reduce_mean(tf.square(y_true_slice - y_pred_slice))
@@ -49,9 +49,9 @@ def build_model(
 
     # Choose loss function based on whether garage_no is specified
     if garage_no is not None:
-        loss_fn = CustomMSESingleGarage(garage_no)
+        loss_fn = _CustomMSESingleGarage(garage_no)
     else:
-        loss_fn = CustomMSEFour
+        loss_fn = _CustomMSEFour
 
     model.compile(
         loss=loss_fn,
@@ -74,4 +74,4 @@ def train_model(
         epochs=training_epochs,
         batch_size=batch_size,
         callbacks=[reduce_lr])
-    model.save_weights(f"{model_directory}/{name}.weights.h5")
+    model.save_weights(f"{MODEL_DIRECTORY}/{name}.weights.h5")

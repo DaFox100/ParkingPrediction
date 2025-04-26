@@ -3,19 +3,22 @@ import pandas as pd
 from keras_model_file import train_model
 from sklearn.preprocessing import MinMaxScaler
 
+from constants import (
+    LOGS_DIRECTORY
+)
+
 enable_instr_day = True
 enable_instr_next_day = True
-logs_directory = "data/Records"
 
 def train_long_model(model, batch_size, future_steps, test_split, seq_size, name, training_epochs):
     
     # Load and preprocess log.csv data
-    data = pd.read_csv(f"{logs_directory}/log.csv")
+    data = pd.read_csv(f"{LOGS_DIRECTORY}/log.csv")
     data = data.drop(columns=["Unnamed: 0", "south density", "west density", "north density", "south compus density"])
 
     # Load the instruction days CSV and prepare it
     if enable_instr_day:
-        instruction_days_df = pd.read_csv(f"{logs_directory}/sjsu_instruction_days.csv")
+        instruction_days_df = pd.read_csv(f"{LOGS_DIRECTORY}/sjsu_instruction_days.csv")
         instruction_days_df["Date"] = pd.to_datetime(instruction_days_df["Date"]).dt.date
         instruction_days_df.rename(columns={"Instruction_Day": "instruction_day"}, inplace=True)
         # Prepare the log data

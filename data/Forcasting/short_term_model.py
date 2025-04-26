@@ -3,7 +3,10 @@ import numpy as np
 import pandas as pd
 from keras_model_file import  train_model
 from sklearn.preprocessing import MinMaxScaler
-logs_directory = "data/Records"
+
+from constants import (
+    LOGS_DIRECTORY
+)
 
 def train_short_model(model, batch_size, future_steps, test_split, seq_size, name, training_epochs):
 
@@ -12,7 +15,7 @@ def train_short_model(model, batch_size, future_steps, test_split, seq_size, nam
     os.makedirs(output_dir, exist_ok=True)
 
     # Load Data
-    data = pd.read_csv(f"{logs_directory}/log.csv")
+    data = pd.read_csv(f"{LOGS_DIRECTORY}/log.csv")
 
     # Drop unnecessary columns
     data = data.drop(columns=["Unnamed: 0", 'south density', 'west density', 'north density', 'south compus density'])

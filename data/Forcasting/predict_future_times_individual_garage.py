@@ -6,11 +6,13 @@ from predict_future_times import plot_prediction
 from keras_model_file import build_model
 from short_term_model import train_short_model
 from long_term_model import train_long_model
+from pathlib import Path
 
-
-garage_names = ["south","west","north","south_campus"]
-model_folder = "data/Forcasting/keras_models"
-logs_directory = "data/Records"
+from constants import (
+    MODEL_DIRECTORY,
+    LOGS_DIRECTORY,
+    GARAGE_NAMES
+)
 
 # control flags  [True,True,True,True] [False,False,False,False] (for easy copy paste)
 long_training_mask      = [False,False,False,False]
@@ -20,7 +22,7 @@ enable_instr_day        =  True
 enable_instr_next_day   =  True
 
 # Load and preprocess log.csv data
-data = pd.read_csv(f"{logs_directory}/log.csv")
+data = pd.read_csv(LOGS_DIRECTORY / "log.csv")
 data = data[-1000:] # WHY IS THIS NESSESSARY TO WORK, I DON'T KNOW
 data = data.drop(columns=["Unnamed: 0", "south density", "west density", "north density", "south compus density"])
 extra_long_data = 0
@@ -30,7 +32,7 @@ short_data = data.drop(columns=["date"]).copy()
 
 # Load the instruction days CSV and prepare it
 if enable_instr_day:
-    instruction_days_df = pd.read_csv(f"{logs_directory}/sjsu_instruction_days.csv")
+    instruction_days_df = pd.read_csv(f"{LOGS_DIRECTORY}/sjsu_instruction_days.csv")
     instruction_days_df["Date"] = pd.to_datetime(instruction_days_df["Date"]).dt.date
     instruction_days_df.rename(columns={"Instruction_Day": "instruction_day"}, inplace=True)
     # Prepare the log data
@@ -88,7 +90,7 @@ long_garage_models = []
 short_garage_models = []
 
 # remember the models will not load correctly if you changes this and don't re-train
-for garage_no, garage in enumerate(garage_names,start=0):
+for garage_no, garage in enumerate(GARAGE_NAMES,start=0):
 # long model hyperparameters 
     long_garage_models.append(build_model(
     lstm_neurons_list=[192,32,192],
@@ -113,27 +115,27 @@ for garage_no, garage in enumerate(garage_names,start=0):
 
 def main():
     # not parrallelizable, not threadsafe :C thanks keras 
-    for index, garage in enumerate(garage_names,start=0):
-        print(f"training long model: {garage}")
-        if long_training_mask[index]:
-            train_long_model(
-            model=long_garage_models[index],
-            training_epochs=35,
-            batch_size=512,
-            future_steps=long_future_steps,
-            test_split=0.8,
-            seq_size=long_seq,
-            name=f"long_model_{garage}")
-        print(f"training short model: {garage}")
-        if short_training_mask[index]:
-            train_short_model(
-            model=short_garage_models[index],
-            training_epochs=25,
-            batch_size=32,
-            future_steps=short_future_steps,
-            test_split=0.8,
-            seq_size=short_seq,
-            name=f"short_model_{garage}")
+    # for index, garage in enumerate(GARAGE_NAMES,start=0):
+    #     print(f"training long model: {garage}")
+    #     if long_training_mask[index]:
+    #         train_long_model(
+    #         model=long_garage_models[index],
+    #         training_epochs=35,
+    #         batch_size=512,
+    #         future_steps=long_future_steps,
+    #         test_split=0.8,
+    #         seq_size=long_seq,
+    #         name=f"long_model_{garage}")
+    #     print(f"training short model: {garage}")
+    #     if short_training_mask[index]:
+    #         train_short_model(
+    #         model=short_garage_models[index],
+    #         training_epochs=25,
+    #         batch_size=32,
+    #         future_steps=short_future_steps,
+    #         test_split=0.8,
+    #         seq_size=short_seq,
+    #         name=f"short_model_{garage}")
 
 
     prediction = make_prediction()
@@ -153,9 +155,10 @@ def make_prediction():
     
     # Load weights if available
     try: 
-        for index,garage in enumerate(garage_names,start=0):
-            long_garage_models[index].load_weights(f"{model_folder}/long_model_{garage}.weights.h5")
-            short_garage_models[index].load_weights(f"{model_folder}/short_model_{garage}.weights.h5")
+        for index,garage in enumerate(GARAGE_NAMES,start=0):
+            # Using Path object for better readability and cross-platform compatibility
+            long_garage_models[index].load_weights(MODEL_DIRECTORY / f"long_model_{garage}.weights.h5")
+            short_garage_models[index].load_weights(MODEL_DIRECTORY / f"short_model_{garage}.weights.h5")
     except Exception as e:
         print("Could not load weights, please verify you have existing weight files, exiting.")
         exit(-1)
@@ -168,7 +171,7 @@ def make_prediction():
     short_preds = []
 
     # Predict using the models, and unscale them
-    for index,garage in enumerate(garage_names,start=0):
+    for index,garage in enumerate(GARAGE_NAMES,start=0):
         long_pred = long_garage_models[index].predict(long_sample_batch, verbose=2)[0]
         short_pred = short_garage_models[index].predict(short_sample_batch, verbose=2)[0]
         long_unscaled_pred   = np.clip(scaler_long.inverse_transform(long_pred)[:, index], 0, 1)
