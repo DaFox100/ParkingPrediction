@@ -68,6 +68,7 @@ export default function DetailedGarageChart({ data }: DetailedGarageChartProps) 
             <Tooltip
               contentStyle={{ backgroundColor: "#1a1d24", borderColor: "#333842" }}
               labelStyle={{ color: "white" }}
+              itemStyle={{ color: "white" }}
               formatter={(value) => [`${value}%`, "Occupancy"]}
             />
             <Bar dataKey="occupancy" radius={[4, 4, 0, 0]}>
