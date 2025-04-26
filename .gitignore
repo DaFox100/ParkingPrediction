@@ -29,6 +29,7 @@
 
 # python
 **/__pycache__/
+**/.venv
 
 .cursorignore
 TODO.txt
