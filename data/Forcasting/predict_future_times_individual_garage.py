@@ -19,11 +19,11 @@ from constants import (
 )
 
 # control flags  [True,True,True,True] [False,False,False,False] (for easy copy paste)
-long_training_mask      = [False,False,False,False]
-short_training_mask     = [False,False,False,False]
-enable_time_encoding    =  True
-enable_instr_day        =  True
-enable_instr_next_day   =  True
+LONG_TRAINING_MASK      = [False,False,False,False]
+SHORT_TRAINING_MASK     = [False,False,False,False]
+ENABLE_TIME_ENCODING    =  True
+ENABLE_INSTR_DAY        =  True
+ENABLE_INSTR_NEXT_DAY   =  True
 
 # counting the extra features added to the long model
 extra_long_data = 0
@@ -48,7 +48,7 @@ def load_instruction_days(data):
     data = pd.merge(data, instruction_days_df, how="left", left_on="date_only", right_on="Date")
     data["instruction_day"] = data["instruction_day"].fillna(False)
     
-    if enable_instr_next_day: 
+    if ENABLE_INSTR_NEXT_DAY: 
         # Add a column for the previous day that maps to the next day's instruction flag
         next_day_instr_df = instruction_days_df.copy()
         next_day_instr_df["Date"] = next_day_instr_df["Date"] - pd.Timedelta(days=1)
@@ -193,9 +193,9 @@ def main():
     short_garage_models = []
     
     # Process the data
-    if enable_instr_day:
+    if ENABLE_INSTR_DAY:
         data = load_instruction_days(data)
-    if enable_time_encoding:
+    if ENABLE_TIME_ENCODING:
         data = cyclical_time_encoding(data)
         
     # Define parameters for long and short models
@@ -209,9 +209,9 @@ def main():
     
     # Train models if the flag is true
     for garage_no, garage in enumerate(GARAGE_NAMES,start=0):
-        if long_training_mask[garage_no]:
+        if LONG_TRAINING_MASK[garage_no]:
             _train_long(garage, long_garage_models[garage_no])
-        if short_training_mask[garage_no]:
+        if SHORT_TRAINING_MASK[garage_no]:
             _train_short(garage, short_garage_models[garage_no])
     
     prediction = _make_prediction(data, short_data, long_garage_models, short_garage_models, short_feature_shape, long_feature_shape)
