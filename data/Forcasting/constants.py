@@ -14,3 +14,11 @@ GARAGE_NAMES = ["south", "west", "north", "south_campus"]
 
 
 # ── TRAINING CONSTANTS ───────────────────────────────────────────────────────────
+# Define parameters for long model
+LONG_SEQ = 8
+LONG_FUTURE_STEPS = 128
+
+# Define parameters for short model
+SHORT_SEQ = 16
+SHORT_FUTURE_STEPS = 16
+

@@ -140,8 +140,8 @@ def make_prediction():
     
     # Load weights if available
     try: 
-        long_garage_model.load_weights(f"{MODEL_DIRECTORY}/long_model.weights.h5")
-        short_garage_model.load_weights(f"{MODEL_DIRECTORY}/short_model.weights.h5")
+        long_garage_model.load_weights(MODEL_DIRECTORY / "long_model.weights.h5")
+        short_garage_model.load_weights(MODEL_DIRECTORY / "short_model.weights.h5")
     except Exception as e:
         print("Could not load weights, please verify you have existing weight files, exiting.")
         exit(-1)
