@@ -5,6 +5,7 @@ scikit-optimize==0.10.2
 sklearn-preprocessing==0.1.0
 keras==3.8.0
 tensorflow==2.18.0
+# tensorflow[and-cuda] for cuda support (not supported on windows)
 Keras-Preprocessing==1.1.2
 
 # model downloads for these hyperparameters:  https://drive.google.com/drive/folders/1M-IWseAn_hjiwQUDIvP4SV1f6R5w-n6T?usp=sharing
