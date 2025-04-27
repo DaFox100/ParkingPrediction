@@ -5,8 +5,8 @@ from pathlib import Path
 DATA_DIR = Path(__file__).resolve().parent.parent # -> Forecasting -> data
 
 # ── DIRECTORIES ───────────────────────────────────────────────────────────────────
-LOGS_DIRECTORY = DATA_DIR / "Records"
-MODEL_DIRECTORY = DATA_DIR / "Forcasting" / "keras_models"
+LOGS_DIRECTORY = DATA_DIR / "records"
+MODEL_DIRECTORY = DATA_DIR / "forecasting" / "keras_models"
 
 
 # ── CONSTANTS ───────────────────────────────────────────────────────────────────
