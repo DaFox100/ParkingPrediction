@@ -6,6 +6,9 @@
 # next.js
 **/.next/
 **/components/ui/
+**/dist/
+**/out/
+*.log
 
 
 # production
