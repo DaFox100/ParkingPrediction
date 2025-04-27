@@ -1,13 +1,10 @@
 pandas==2.2.3
-numpy==2.2.5
-matplotlib==3.9.2
+numpy==2.0.2
 scikit-optimize==0.10.2
 sklearn-preprocessing==0.1.0
 keras==3.8.0
-tensorflow==2.18.0
-# tensorflow[and-cuda] for cuda support (not supported on windows)
+tensorflow[and-cuda]==2.18.0 # Don't need cuda if on windows
 Keras-Preprocessing==1.1.2
-
 config==0.5.1
 matplotlib==3.10.1
 Requests==2.32.3
