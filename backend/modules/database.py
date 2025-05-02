@@ -7,6 +7,7 @@ import os
 import asyncio
 from pydantic import BaseModel
 from bson import ObjectId
+import pandas as pd
 
 load_dotenv()
 
@@ -18,7 +19,7 @@ client = AsyncIOMotorClient(MONGO_URI)
 db = client[DATABASE_NAME]
 
 collection = db["datapoints"]
-hourly_collection = db["hourly_aggregates"]
+averaged_collection = db["hourly_aggregates"]
 
 AVAILABLE_DATES = []
 
@@ -74,9 +75,9 @@ async def get_database():
     return db
 
 async def init_available_dates():
-    global hourly_collection
+    global averaged_collection
     global AVAILABLE_DATES
-    AVAILABLE_DATES = await hourly_collection.distinct("day")
+    AVAILABLE_DATES = await averaged_collection.distinct("day")
     
 async def get_available_dates() -> List[str]:
     return AVAILABLE_DATES
@@ -166,7 +167,7 @@ async def _aggregate_hourly_data():
     """
     Aggregate all datapoints into hourly averages and store them in a new collection.
     Each document contains 24 hourly values for a specific day and garage.
-    Skips days that are already present in the aggregate collection.
+    Skips days that are already present and marked as complete in the aggregate collection.
     """
     collection = db["datapoints"]
     hourly_collection = db["hourly_aggregates"]
@@ -187,24 +188,25 @@ async def _aggregate_hourly_data():
     cursor = collection.aggregate(pipeline)
     dates = await cursor.to_list(length=None)
     
-    # Get all dates that are already in the aggregate collection
-    existing_dates = await hourly_collection.distinct("day")
-    
     # For each date and garage, aggregate hourly data
     for date_doc in dates:
         date_str = date_doc["_id"]
-        
-        # Skip if this date is already in the aggregate collection
-        if date_str in existing_dates:
-            print(f"Skipping {date_str} - already aggregated")
-            continue
-            
         query_date = datetime.strptime(date_str, "%Y-%m-%d")
         
         # Process each garage
         for garage_id, status_field in GARAGE_MAPPING.items():
             # Skip duplicate mappings (like "1" and "south" mapping to same field)
             if garage_id.isdigit():
+                # Check if document exists and is complete
+                existing_doc = await hourly_collection.find_one({
+                    "day": date_str,
+                    "garage_id": int(garage_id) if garage_id.isdigit() else garage_id
+                })
+                
+                if existing_doc and existing_doc["complete"] is True:
+                    print(f"Skipping {date_str} for garage {garage_id} - already complete")
+                    continue
+                
                 pipeline = [
                     {
                         "$match": {
@@ -239,11 +241,15 @@ async def _aggregate_hourly_data():
                     hour = hour_data["_id"]
                     values[hour] = round(hour_data["avg_value"])
                 
+                # Check if all hours have data
+                is_complete = all(v is not None for v in values)
+                
                 # Create document for this day and garage
                 doc = {
                     "day": date_str,
                     "garage_id": int(garage_id) if garage_id.isdigit() else garage_id,
-                    "values": values
+                    "values": values,
+                    "complete": is_complete
                 }
                 
                 # Upsert the document
@@ -253,7 +259,7 @@ async def _aggregate_hourly_data():
                     upsert=True
                 )
 
-async def get_hourly_aggregate(date: str, garage_id: str) -> List[float | None]:
+async def get_data_per_hour(date: str, garage_id: str) -> List[float | None]:
     """
     Get the hourly aggregated data for a specific date and garage.
     
