@@ -81,11 +81,14 @@ async def init_available_dates():
 async def get_available_dates() -> List[str]:
     return AVAILABLE_DATES
 
-async def get_datapoint(timestamp: datetime) -> Datapoint:
+async def get_datapoint(timestamp: datetime) -> Optional[Datapoint]:
     collection = db["datapoints"]
     query = {"timestamp": timestamp}
     datapoint = await collection.find_one(query)
-    return Datapoint(**datapoint)
+    if datapoint:
+        return Datapoint(**datapoint)
+    else:
+        return None
 
 async def insert_datapoint(data: Datapoint):
     """
