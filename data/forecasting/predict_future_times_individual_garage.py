@@ -221,8 +221,8 @@ def main():
         if SHORT_TRAINING_MASK[garage_no]:
             _train_short(garage, short_garage_models[garage_no])
     
-    prediction: np.ndarray = _make_prediction(long_data.copy(), short_data.copy(), long_garage_models, short_garage_models, short_feature_shape, long_feature_shape)
-    utils.plot_prediction(prediction, short_data.copy(), data.copy())
+    prediction: np.ndarray = _make_prediction(long_data, short_data, long_garage_models, short_garage_models, short_feature_shape, long_feature_shape)
+    utils.plot_prediction(prediction, short_data, data)
 
 
 if __name__ == "__main__":
