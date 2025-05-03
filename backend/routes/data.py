@@ -22,10 +22,10 @@ router = APIRouter(
 )
 
 # Global variables to store predictions for each garage
-north_predictions: List[float] = []
-south_predictions: List[float] = []
-west_predictions: List[float] = []
-south_campus_predictions: List[float] = []
+north_predictions: List[int] = []
+south_predictions: List[int] = []
+west_predictions: List[int] = []
+south_campus_predictions: List[int] = []
 
 async def update_prediction():
     """Update the global prediction variables with new predictions."""

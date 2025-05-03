@@ -48,20 +48,20 @@ def plot_prediction(
         w_pred[:, None] * predicted_blend
     )
 
-    # Final Plot
-    plt.figure(figsize=(12, 6))
-    for i in range(4):
-        actual_y = visible_real[:, i]
-        plt.plot(visible_time, actual_y, label=f'Actual Feature {i+1}')
-        plt.plot(date_pred_x, prediction[:, i], '--', label=f'Predicted Feature {i+1}')
+    # # Final Plot
+    # plt.figure(figsize=(12, 6))
+    # for i in range(4):
+    #     actual_y = visible_real[:, i]
+    #     plt.plot(visible_time, actual_y, label=f'Actual Feature {i+1}')
+    #     plt.plot(date_pred_x, prediction[:, i], '--', label=f'Predicted Feature {i+1}')
 
-    plt.xlabel("Time")
-    plt.ylabel("Value")
-    plt.title("Actual vs. Smoothed Forecast with Adjusted Scaler Usage")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-    print("Plot shown here")
+    # plt.xlabel("Time")
+    # plt.ylabel("Value")
+    # plt.title("Actual vs. Smoothed Forecast with Adjusted Scaler Usage")
+    # plt.legend()
+    # plt.grid(True)
+    # plt.show()
+    # print("Plot shown here")
 
     # If start_time and end_time are provided, extract hourly values for all garages
     if start_time is not None and end_time is not None:

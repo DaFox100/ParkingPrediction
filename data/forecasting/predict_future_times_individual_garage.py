@@ -1,41 +1,50 @@
 import os
+import sys
+from pathlib import Path
+
+# Add the project root to Python path
+project_root = Path(__file__).parent.parent.parent
+sys.path.append(str(project_root))
+
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from typing import List, Tuple, Any, Dict, Optional, Union
 from keras import Model
-from pathlib import Path
 from datetime import datetime
-
-from data.forecasting.keras_model_file import build_model
-from data.forecasting.short_term_model import train_short_model
-from data.forecasting.long_term_model import train_long_model
-from data.forecasting import utils
-from data.forecasting.constants import (
-    MODEL_DIRECTORY,
-    LOGS_DIRECTORY,
-    GARAGE_NAMES,
-    LONG_SEQ,
-    LONG_FUTURE_STEPS,
-    SHORT_SEQ,
-    SHORT_FUTURE_STEPS
-)
-
-# from keras_model_file import build_model
-# from short_term_model import train_short_model
-# from long_term_model import train_long_model
-# import utils
 from pymongo import MongoClient
 from dotenv import load_dotenv
-# from constants import (
-#     MODEL_DIRECTORY,
-#     LOGS_DIRECTORY,
-#     GARAGE_NAMES,
-#     LONG_SEQ,
-#     LONG_FUTURE_STEPS,
-#     SHORT_SEQ,
-#     SHORT_FUTURE_STEPS
-# )
+
+# Try to import using the full path first, fall back to local imports if that fails
+try:
+    from data.forecasting.keras_model_file import build_model
+    from data.forecasting.short_term_model import train_short_model
+    from data.forecasting.long_term_model import train_long_model
+    from data.forecasting import utils
+    from data.forecasting.constants import (
+        MODEL_DIRECTORY,
+        LOGS_DIRECTORY,
+        GARAGE_NAMES,
+        LONG_SEQ,
+        LONG_FUTURE_STEPS,
+        SHORT_SEQ,
+        SHORT_FUTURE_STEPS
+    )
+except ImportError:
+    # Fall back to local imports if the full path imports fail
+    from keras_model_file import build_model
+    from short_term_model import train_short_model
+    from long_term_model import train_long_model
+    import utils
+    from constants import (
+        MODEL_DIRECTORY,
+        LOGS_DIRECTORY,
+        GARAGE_NAMES,
+        LONG_SEQ,
+        LONG_FUTURE_STEPS,
+        SHORT_SEQ,
+        SHORT_FUTURE_STEPS
+    )
 
 load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI")
@@ -285,5 +294,12 @@ def calculate_prediction(forecast_start: datetime) -> List[float]:
     return values
 
 if __name__ == "__main__":
-    values = calculate_prediction(datetime(2025, 5, 2, 0, 0))
-    print(values)
+    values = calculate_prediction(datetime(2025, 5, 3, 0, 0))
+    print_string = ""
+    for list in values:
+        print_string += "\nGarage " + str(values.index(list)) + ": "
+        for i in range(len(list)):
+            if i % 24 == 0:
+                print_string += "\n Day " + str(int((i / 24)) + 1) + ": "
+            print_string += str(list[i]) + " "
+    print(print_string)
