@@ -1,4 +1,3 @@
-# This script fetches historical weather data from NWS's API
 import requests
 import csv
 
