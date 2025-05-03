@@ -37,29 +37,30 @@ export default function ParkingGarageCard({
 
   return (
     <div
-      className={`bg-[#252830] rounded-lg transition-all duration-500 ease-in-out overflow-hidden
+      className={`bg-[#252830] rounded-3xl transition-all duration-500 ease-in-out overflow-hidden
         ${isExpanded ? "md:col-span-2 row-span-2" : ""}`}
     >
-      <div className="p-6 cursor-pointer hover:bg-[#2a2e38] transition-colors" onClick={() => onGarageClick(id)}>
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
-            <span className="text-xs text-white">P</span>
+      {/* DO NOT USE h-full, it will cause the card to not show chart */}
+      <div className="p-8 cursor-pointer hover:bg-background transition-colors flex flex-col justify-between" onClick={() => onGarageClick(id)}>
+        <div className="flex items-center gap-4 mb-4">
+          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
+            <span className="text-lg text-white font-semibold">P</span>
           </div>
-          <h2 className="text-xl font-medium">{name}</h2>
+          <h2 className="text-2xl md:text-3xl">{name}</h2>
         </div>
 
         <div className="flex justify-between items-end">
           <div>
-            <p className="text-6xl font-bold mb-2">{currentOccupancy}%</p>
-            <p className={`text-lg ${trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
+            <p className="text-7xl md:text-8xl mb-2 leading-none">{currentOccupancy}%</p>
+            <p className={`text-2xl md:text-3xl ${trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
               {trendDirection === "down" ? "-" : "+"}
               {Math.abs(trend)}% next hour
             </p>
           </div>
 
-          <div className="w-32 h-16 relative">
+          <div className="w-36 h-20 relative">
             <TrendChart data={garage.trendData} direction={trendDirection} />
-            <div className="absolute bottom-0 right-0 text-sm text-gray-400">{nextHour}</div>
+            <div className="absolute bottom-0 right-0 text-base text-gray-400">{nextHour}</div>
           </div>
         </div>
       </div>
@@ -70,7 +71,7 @@ export default function ParkingGarageCard({
       >
         <div className="p-6 pt-0 border-t border-[#333842] mt-2">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-semibold">{name} Garage</h2>
+            <h2 className="text-2xl">{name} Garage</h2>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 text-gray-400">
                 <Calendar size={18} />
