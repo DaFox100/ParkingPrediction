@@ -2,7 +2,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.losses import Loss
 
-from constants import (
+from data.forecasting.constants import (
     MODEL_DIRECTORY
 )
 

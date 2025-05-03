@@ -99,7 +99,7 @@ export default function ParkingGarageCard({
             </div>
           </div>
 
-          <DetailedGarageChart data={garage.hourlyData} />
+          <DetailedGarageChart data={garage.hourlyData} selectedDate={selectedDate} />
         </div>
       </div>
     </div>

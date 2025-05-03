@@ -1,16 +1,17 @@
+import os
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from typing import List, Tuple, Any, Dict, Optional, Union
 from keras import Model
 from pathlib import Path
+from datetime import datetime
 
-from keras_model_file import build_model
-from short_term_model import train_short_model
-from long_term_model import train_long_model
-import utils
-
-from constants import (
+from data.forecasting.keras_model_file import build_model
+from data.forecasting.short_term_model import train_short_model
+from data.forecasting.long_term_model import train_long_model
+from data.forecasting import utils
+from data.forecasting.constants import (
     MODEL_DIRECTORY,
     LOGS_DIRECTORY,
     GARAGE_NAMES,
@@ -19,6 +20,25 @@ from constants import (
     SHORT_SEQ,
     SHORT_FUTURE_STEPS
 )
+
+# from keras_model_file import build_model
+# from short_term_model import train_short_model
+# from long_term_model import train_long_model
+# import utils
+from pymongo import MongoClient
+from dotenv import load_dotenv
+# from constants import (
+#     MODEL_DIRECTORY,
+#     LOGS_DIRECTORY,
+#     GARAGE_NAMES,
+#     LONG_SEQ,
+#     LONG_FUTURE_STEPS,
+#     SHORT_SEQ,
+#     SHORT_FUTURE_STEPS
+# )
+
+load_dotenv()
+MONGO_URI = os.getenv("MONGO_URI")
 
 # control flags  [True,True,True,True] [False,False,False,False] (for easy copy paste)
 LONG_TRAINING_MASK: List[bool]      = [False,False,False,False]
@@ -35,7 +55,41 @@ def load_data() -> pd.DataFrame:
     data: pd.DataFrame = pd.read_csv(LOGS_DIRECTORY / "log.csv")
     data = data[-1000:] # WHY IS THIS NESSESSARY TO WORK, I DON'T KNOW
     data = data.drop(columns=["Unnamed: 0", "south density", "west density", "north density", "south compus density"])
+    print("\n", data.head(), "\n")
     return data
+
+def load_data_from_mongodb(forecast_start: datetime, limit: int = 1000) -> pd.DataFrame:
+    client = MongoClient(MONGO_URI)
+    db = client["sjparking"]
+    collection = db["datapoints"]
+
+    # Get the 1000 most recent datapoints before forecast_start, sorted descending
+    cursor = collection.find(
+        {"timestamp": {"$lt": forecast_start}, "metadata": "sjparking"}
+    ).sort("timestamp", -1).limit(limit)
+    docs = list(cursor)
+    if not docs:
+        raise ValueError("No data loaded from MongoDB for the requested range!")
+    # Reverse to chronological order (oldest to newest)
+    docs = docs[::-1]
+    df = pd.DataFrame(docs)
+    # Rename columns to match CSV
+    df.rename(columns={
+        "timestamp": "date",
+        "south_status": "south",
+        "west_status": "west",
+        "north_status": "north",
+        "south_campus_status": "south campus"  # <-- match CSV
+    }, inplace=True)
+    df = df.drop(columns=["_id", "metadata"])
+    # Scale integer columns to 0.00–1.00
+    for col in ["south", "west", "north", "south campus"]:
+        df[col] = df[col] / 100.0
+    # Reorder columns to match CSV
+    df = df[["date", "south", "west", "north", "south campus"]]
+    print("\nMongoDB data range:", df['date'].min(), "to", df['date'].max(), "\n")
+    print("\n", df.head(), "\n")
+    return df
 
 # Load the instruction days CSV and prepare it
 def load_instruction_days(data: pd.DataFrame) -> pd.DataFrame:
@@ -189,10 +243,13 @@ def _make_prediction( data: pd.DataFrame, short_data: pd.DataFrame,
         combined[short_length:, i] = long_preds[i][short_length:]
 
     return combined
-   
-def main():
+
+
+def calculate_prediction(forecast_start: datetime) -> List[float]:
     global extra_long_data
-    data: pd.DataFrame = load_data()
+
+    data: pd.DataFrame = load_data_from_mongodb(forecast_start)
+    # data: pd.DataFrame = load_data()
     short_data: pd.DataFrame = data.drop(columns=["date"]).copy() # Keep a copy of the raw density data (without date)
     long_garage_models: List[Model] = []
     short_garage_models: List[Model] = []
@@ -222,8 +279,11 @@ def main():
             _train_short(garage, short_garage_models[garage_no])
     
     prediction: np.ndarray = _make_prediction(long_data, short_data, long_garage_models, short_garage_models, short_feature_shape, long_feature_shape)
-    utils.plot_prediction(prediction, short_data, data)
-
+    start_time: pd.Timestamp = pd.Timestamp(forecast_start)
+    end_time: pd.Timestamp = pd.Timestamp(forecast_start + pd.Timedelta(days=1))
+    values = utils.plot_prediction(prediction, short_data, data, start_time, end_time)
+    return values
 
 if __name__ == "__main__":
-    main()
+    values = calculate_prediction(datetime(2025, 5, 2, 0, 0))
+    print(values)

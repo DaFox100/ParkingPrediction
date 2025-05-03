@@ -14,15 +14,25 @@ export async function getParkingData(date?: string): Promise<GarageData[]> {
       }
       const data = await response.json()
       
+      // Get predictions for this garage
+      const predictions = await getPredictions(id)
+      
       // Convert hourly values to the format expected by the frontend
-      const hourlyData = data.hourly_values.map((value: number | null, index: number) => ({
-        time: `${index.toString().padStart(2, '0')}:00`,
-        occupancy: value || 0,
-        forecast: false,
-        rawData: data.raw_data.filter((point: RawDataPoint) => 
-          point.time.startsWith(`${index.toString().padStart(2, '0')}:`)
-        )
-      }))
+      const hourlyData = data.hourly_values.map((value: number | null, index: number) => {
+        const hour = index.toString().padStart(2, '0')
+        const time = `${hour}:00`
+        const isFuture = new Date().getHours() < index
+        const occupancy = value !== null ? value : (isFuture ? predictions[index] : 0)
+        
+        return {
+          time,
+          occupancy,
+          forecast: isFuture,
+          rawData: data.raw_data.filter((point: RawDataPoint) => 
+            point.time.startsWith(`${hour}:`)
+          )
+        }
+      })
       
       // Calculate current occupancy and trend
       const currentHour = new Date().getHours()
@@ -114,4 +124,32 @@ function generateTrendData(current: number, trend: number) {
   }
 
   return data
+}
+
+// Get the latest update timestamp from the API
+export async function getLatestUpdate(): Promise<string> {
+  try {
+    const response = await fetch('http://127.0.0.1:8000/api/latest-update')
+    if (!response.ok) {
+      throw new Error('Failed to fetch latest update timestamp')
+    }
+    const data = await response.json()
+    return data.timestamp
+  } catch (error) {
+    console.error('Error fetching latest update timestamp:', error)
+    return new Date().toISOString() // Return current time as fallback
+  }
+}
+
+export async function getPredictions(garageId: string): Promise<number[]> {
+  try {
+    const response = await fetch(`http://127.0.0.1:8000/api/predictions/${garageId}`)
+    if (!response.ok) {
+      throw new Error(`Failed to fetch predictions for ${garageId}`)
+    }
+    return await response.json()
+  } catch (error) {
+    console.error(`Error fetching predictions for ${garageId}:`, error)
+    return Array(24).fill(0) // Return zeros as fallback
+  }
 }

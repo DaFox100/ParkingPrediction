@@ -1,5 +1,5 @@
 from motor.motor_asyncio import AsyncIOMotorClient
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 from dotenv import load_dotenv
@@ -20,8 +20,10 @@ db = client[DATABASE_NAME]
 
 collection = db["datapoints"]
 averaged_collection = db["hourly_aggregates"]
+prediction_collection = db["predictions"]
 
 AVAILABLE_DATES = []
+MOST_RECENT_TIMESTAMP = None
 
 # Mapping of garage identifiers to their status fields
 GARAGE_MAPPING = {
@@ -34,6 +36,8 @@ GARAGE_MAPPING = {
     "4": "south_campus_status",
     "south_campus": "south_campus_status"
 }
+
+GARAGE_NAMES = ["south", "west", "north", "south_campus"]
 
 GARAGE_ID_MAPPING = {
     "south": 1,
@@ -53,6 +57,8 @@ class Datapoint(BaseModel):
 async def init_db():
     """Initialize the database and create time series collection if it doesn't exist"""
     try:
+        global MOST_RECENT_TIMESTAMP
+        
         # Check if the time series collection exists
         collections = await db.list_collection_names()
         if "datapoints" not in collections:
@@ -67,6 +73,14 @@ async def init_db():
             )
             # Create index on timestamp
             await db.datapoints.create_index([("timestamp", 1)])
+        
+        # Get the most recent timestamp
+        most_recent = await collection.find_one(
+            sort=[("timestamp", -1)]
+        )
+        if most_recent:
+            MOST_RECENT_TIMESTAMP = most_recent["timestamp"]
+        
     except Exception as e:
         print(f"Error initializing database: {e}")
 
@@ -242,7 +256,10 @@ async def _aggregate_hourly_data():
                     values[hour] = round(hour_data["avg_value"])
                 
                 # Check if all hours have data
-                is_complete = all(v is not None for v in values)
+                if (values[23] is not None):
+                    is_complete = True
+                else:
+                    is_complete = False
                 
                 # Create document for this day and garage
                 doc = {
@@ -262,15 +279,35 @@ async def _aggregate_hourly_data():
 async def get_data_per_hour(date: str, garage_id: str) -> List[float | None]:
     """
     Get the hourly aggregated data for a specific date and garage.
+    Checks for new data and re-aggregates if new datapoints are found.
     
     Args:
         date (str): Date in YYYY-MM-DD format
         garage_id (str): Garage identifier (can be number or name)
         
     Returns:
-        Dictionary containing the hourly aggregated data
+        List containing the hourly aggregated data
     """
-    collection = db["hourly_aggregates"]
+    global MOST_RECENT_TIMESTAMP
+    
+    # Check for new data
+    most_recent = await collection.find_one(
+        sort=[("timestamp", -1)]
+    )
+    
+    if most_recent and most_recent["timestamp"] != MOST_RECENT_TIMESTAMP:
+        # New data found, update the global timestamp
+        MOST_RECENT_TIMESTAMP = most_recent["timestamp"]
+        
+        # Get the date of the new data
+        new_date = MOST_RECENT_TIMESTAMP.strftime("%Y-%m-%d")
+        
+        # Delete existing aggregated data for this date
+        await averaged_collection.delete_many({"day": new_date})
+        
+        # Re-aggregate the data for this date
+        await _aggregate_hourly_data_for_date(new_date)
+        print(f"Aggregated data for {new_date}")
     
     # Convert garage_id to int if it's a number
     try:
@@ -283,11 +320,86 @@ async def get_data_per_hour(date: str, garage_id: str) -> List[float | None]:
         "garage_id": garage_id
     }
     
-    result = await collection.find_one(query, {"_id": 0, "values": 1})
+    result = await averaged_collection.find_one(query, {"_id": 0, "values": 1})
     if result:
         return result["values"]
     else:
         return []
+
+async def _aggregate_hourly_data_for_date(date_str: str):
+    """
+    Aggregate hourly data for a specific date.
+    
+    Args:
+        date_str (str): Date in YYYY-MM-DD format
+    """
+    collection = db["datapoints"]
+    hourly_collection = db["hourly_aggregates"]
+    
+    query_date = datetime.strptime(date_str, "%Y-%m-%d")
+    
+    # Process each garage
+    for garage_id, status_field in GARAGE_MAPPING.items():
+        # Skip duplicate mappings (like "1" and "south" mapping to same field)
+        if garage_id.isdigit():
+            # Convert garage_id to int for storage
+            garage_id_int = int(garage_id)
+            
+            pipeline = [
+                {
+                    "$match": {
+                        "timestamp": {
+                            "$gte": query_date,
+                            "$lt": query_date.replace(hour=23, minute=59, second=59)
+                        },
+                        "metadata": "sjparking"
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": {
+                            "$hour": "$timestamp"
+                        },
+                        "avg_value": {
+                            "$avg": f"${status_field}"
+                        }
+                    }
+                },
+                {
+                    "$sort": {"_id": 1}
+                }
+            ]
+            
+            cursor = collection.aggregate(pipeline)
+            hourly_data = await cursor.to_list(length=None)
+            
+            # Create array of 24 values, filling missing hours with None
+            values = [None] * 24
+            for hour_data in hourly_data:
+                hour = hour_data["_id"]
+                values[hour] = round(hour_data["avg_value"])
+            
+            # Check if all hours have data
+            is_complete = values[23] is not None
+            
+            # Create document for this day and garage
+            doc = {
+                "day": date_str,
+                "garage_id": garage_id_int,
+                "values": values,
+                "complete": is_complete
+            }
+            
+            # Delete any existing document for this day and garage
+            await hourly_collection.delete_one({
+                "day": date_str,
+                "garage_id": garage_id_int
+            })
+            
+            # Insert the new document
+            await hourly_collection.insert_one(doc)
+            
+            print(f"Aggregated data for {date_str} - Garage {garage_id_int}: {values}")
 
 # if __name__ == "__main__":
 #     async def main():
@@ -296,3 +408,20 @@ async def get_data_per_hour(date: str, garage_id: str) -> List[float | None]:
 #         await collection.delete_one({"_id": ObjectId("67f9dd90623e5d68731498c3")})
 #         print("Datapoint deleted")
 #     asyncio.run(main())
+
+async def main():
+    await _aggregate_hourly_data_for_date("2025-05-02")
+    
+if __name__ == "__main__":
+    asyncio.run(main())
+
+async def get_latest_timestamp() -> datetime:
+    """
+    Get the most recent timestamp from the database.
+    
+    Returns:
+        datetime: The most recent timestamp
+    """
+    global MOST_RECENT_TIMESTAMP
+    return MOST_RECENT_TIMESTAMP
+

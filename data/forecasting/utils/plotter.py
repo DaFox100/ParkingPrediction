@@ -2,7 +2,13 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_prediction(prediction: np.ndarray, short_data: pd.DataFrame, data: pd.DataFrame):
+def plot_prediction(
+    prediction: np.ndarray, 
+    short_data: pd.DataFrame, 
+    data: pd.DataFrame,
+    start_time: pd.Timestamp = None,
+    end_time: pd.Timestamp = None,
+):
     
     # data = pd.DataFrame(data)
     # data['date'] = pd.to_datetime(data['date'])
@@ -55,3 +61,26 @@ def plot_prediction(prediction: np.ndarray, short_data: pd.DataFrame, data: pd.D
     plt.legend()
     plt.grid(True)
     plt.show()
+    print("Plot shown here")
+
+    # If start_time and end_time are provided, extract hourly values for all garages
+    if start_time is not None and end_time is not None:
+        # Ensure date_pred_x is a pandas DatetimeIndex for easy comparison
+        date_pred_x_index = pd.DatetimeIndex(date_pred_x)
+        # Build a list of hourly timestamps within the range
+        hourly_times = pd.date_range(start=start_time, end=end_time, freq='H')
+        
+        # Initialize a list to store predictions for each garage
+        garage_predictions = [[] for _ in range(4)]
+        
+        for t in hourly_times:
+            # Find the closest prediction timestamp
+            diffs = np.abs((date_pred_x_index - t).total_seconds())
+            idx = np.argmin(diffs)
+            # Get the predicted values for all garages
+            for garage_idx in range(4):
+                garage_predictions[garage_idx].append(float(prediction[idx, garage_idx]))
+        
+        print(f"Hourly predicted values for all garages from {start_time} to {end_time}:")
+        return garage_predictions
+    

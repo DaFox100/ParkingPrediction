@@ -17,10 +17,14 @@ import type { HourlyData } from "@/lib/types"
 
 interface DetailedGarageChartProps {
   data: HourlyData[]
+  selectedDate: string
 }
 
-export default function DetailedGarageChart({ data }: DetailedGarageChartProps) {
-  const [viewMode, setViewMode] = useState<"today" | "historical">("today")
+export default function DetailedGarageChart({ data, selectedDate }: DetailedGarageChartProps) {
+  const today = new Date()
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const isToday = selectedDate === todayStr
+  const viewMode = isToday ? "today" : "historical"
 
   // Find the highest occupancy point to highlight
   const maxOccupancy = data.reduce((max, point) => (point.occupancy > max.occupancy ? point : max), data[0])
@@ -34,14 +38,12 @@ export default function DetailedGarageChart({ data }: DetailedGarageChartProps) 
       <div className="flex justify-end mb-4">
         <div className="flex rounded-md overflow-hidden">
           <button
-            className={`px-4 py-2 ${viewMode === "today" ? "bg-blue-600" : "bg-[#333842]"}`}
-            onClick={() => setViewMode("today")}
+            className={`px-4 py-2 cursor-default ${viewMode === "today" ? "bg-blue-600" : "bg-[#333842]"}`}
           >
             Today
           </button>
           <button
-            className={`px-4 py-2 ${viewMode === "historical" ? "bg-blue-600" : "bg-[#333842]"}`}
-            onClick={() => setViewMode("historical")}
+            className={`px-4 py-2 cursor-default ${viewMode === "historical" ? "bg-blue-600" : "bg-[#333842]"}`}
           >
             Historical
           </button>
