@@ -6,6 +6,11 @@ export async function getParkingData(date?: string): Promise<GarageData[]> {
   const garages = ['north', 'west', 'south', 'south_campus']
   const names = ['North', 'West', 'South', 'SouthCampus']
   
+  // Check if we're viewing today's data
+  const today = new Date()
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const isToday = selectedDate === todayStr
+  
   const garageDataPromises = garages.map(async (id) => {
     try {
       const response = await fetch(`http://127.0.0.1:8000/api/data?date=${selectedDate}&garage_id=${id}`)
@@ -14,15 +19,15 @@ export async function getParkingData(date?: string): Promise<GarageData[]> {
       }
       const data = await response.json()
       
-      // Get predictions for this garage
-      const predictions = await getPredictions(id)
+      // Get predictions for this garage only if viewing today's data
+      const predictions = isToday ? await getPredictions(id) : null
       
       // Convert hourly values to the format expected by the frontend
       const hourlyData = data.hourly_values.map((value: number | null, index: number) => {
         const hour = index.toString().padStart(2, '0')
         const time = `${hour}:00`
-        const isFuture = new Date().getHours() < index
-        const occupancy = value !== null ? value : (isFuture ? predictions[index] : 0)
+        const isFuture = isToday && new Date().getHours() < index
+        const occupancy = value !== null ? value : (isFuture && predictions ? predictions[index] : 0)
         
         return {
           time,
