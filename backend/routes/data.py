@@ -15,6 +15,7 @@ from modules.database import get_garage_data, get_available_dates, get_data_per_
 from data.forecasting.predict_future_times_individual_garage import calculate_prediction
 
 
+
 router = APIRouter(
     prefix="/api",
     tags=["data"]
@@ -34,10 +35,10 @@ async def update_prediction():
     garage_predictions = await run_in_threadpool(calculate_prediction, today)
     
     # Store predictions in global variables
-    north_predictions = [int(v * 100) for v in garage_predictions[2]]
-    south_predictions = [int(v * 100) for v in garage_predictions[0]]
-    west_predictions = [int(v * 100) for v in garage_predictions[1]]
-    south_campus_predictions = [int(v * 100) for v in garage_predictions[3]]
+    north_predictions = garage_predictions[2]
+    south_predictions = garage_predictions[0]
+    west_predictions = garage_predictions[1]
+    south_campus_predictions = garage_predictions[3]
 
 # Response model that returns the raw data
 class DataResponse(BaseModel):

@@ -79,7 +79,7 @@ def plot_prediction(
             idx = np.argmin(diffs)
             # Get the predicted values for all garages
             for garage_idx in range(4):
-                garage_predictions[garage_idx].append(float(prediction[idx, garage_idx]))
+                garage_predictions[garage_idx].append(int(prediction[idx, garage_idx]*100))
         
         print(f"Hourly predicted values for all garages from {start_time} to {end_time}:")
         return garage_predictions
