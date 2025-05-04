@@ -38,8 +38,38 @@ export default function DetailedGarageChart({ data, selectedDate, isTodayMode, o
   // Format the data with AM/PM times
   const formattedData = data.map(entry => ({
     ...entry,
-    displayTime: formatTime(entry.time)
+    displayTime: formatTime(entry.time),
+    actualOccupancy: entry.occupancy,
+    predictedOccupancy: entry.predictedOccupancy ?? entry.occupancy
   }))
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const entry = payload[0].payload
+      const isForecast = entry.forecast
+      const isCurrentHour = isToday && entry.time === currentHourStr
+      const isPastHour = isToday && entry.time < currentHourStr
+
+      return (
+        <div className="bg-[#1a1d24] p-3 border border-[#333842] rounded">
+          <p className="text-white text-2xl">{label}</p>
+          {isForecast ? (
+            <p className="text-blue-400 text-2xl">Predicted: {entry.predictedOccupancy}%</p>
+          ) : (isPastHour || isCurrentHour) ? (
+            <>
+              <p className="text-white text-2xl">Occupancy: {entry.actualOccupancy}%</p>
+              <p className="text-blue-400">Predicted: {entry.predictedOccupancy}%</p>
+              <p></p>
+              <p className="text-yellow-400">{entry.actualOccupancy - entry.predictedOccupancy}% Variance</p>
+            </>
+          ) : (
+            <p className="text-white">Occupancy: {entry.actualOccupancy}%</p>
+          )}
+        </div>
+      )
+    }
+    return null
+  }
 
   return (
     <div>
@@ -82,17 +112,12 @@ export default function DetailedGarageChart({ data, selectedDate, isTodayMode, o
               tickLine={false} 
             />
             <YAxis tick={{ fill: "#9ca3af" }} axisLine={{ stroke: "#333842" }} tickLine={false} domain={[0, 100]} />
-            <Tooltip
-              contentStyle={{ backgroundColor: "#1a1d24", borderColor: "#333842" }}
-              labelStyle={{ color: "white" }}
-              itemStyle={{ color: "white" }}
-              formatter={(value) => [`${value}%`, "Occupancy"]}
-            />
-            <Bar dataKey="occupancy" radius={[4, 4, 0, 0]}>
+            <Tooltip content={<CustomTooltip />} />
+            <Bar dataKey="actualOccupancy" radius={[4, 4, 0, 0]}>
               {formattedData.map((entry, index) => {
                 const isForecast = entry.forecast || (isToday && entry.time > currentHourStr)
-                const isHighOccupancy = entry.occupancy >= 90
-                const isMediumOccupancy = entry.occupancy >= 80 && entry.occupancy < 90
+                const isHighOccupancy = entry.actualOccupancy >= 90
+                const isMediumOccupancy = entry.actualOccupancy >= 80 && entry.actualOccupancy < 90
                 
                 let fillColor = isToday ? "#3b82f6" : "#4b5563" // blue or gray
                 if (isHighOccupancy) {

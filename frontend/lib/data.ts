@@ -32,6 +32,7 @@ export async function getParkingData(date?: string): Promise<GarageData[]> {
         return {
           time,
           occupancy,
+          predictedOccupancy: predictions ? predictions[index] : null,
           forecast: isFuture,
           rawData: data.raw_data.filter((point: RawDataPoint) => 
             point.time.startsWith(`${hour}:`)
