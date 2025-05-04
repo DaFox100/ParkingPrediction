@@ -31,6 +31,15 @@ export default function DetailedGarageChart({ data, selectedDate, isTodayMode, o
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const isToday = selectedDate === todayStr
 
+  // Automatically switch mode based on selected date
+  useEffect(() => {
+    if (isToday && !isTodayMode) {
+      onModeChange('today')
+    } else if (!isToday && isTodayMode) {
+      onModeChange('historical')
+    }
+  }, [selectedDate, isToday, isTodayMode, onModeChange])
+
   // Find the highest occupancy point to highlight
   const maxOccupancy = data.reduce((max, point) => (point.occupancy > max.occupancy ? point : max), data[0])
 
