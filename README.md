@@ -9,12 +9,12 @@ PART 1 - SET UP YOUR VENV AND INSTALL REQUIREMENTS - FASTAPI
 - ALT - Do nothing and just using global python 3.12 version
 4. Initialize the venv using the cmd by running <./.venv/Scripts/Activate.ps1>
 5. We should still be in the \backend folder, run <pip install -r requirements.txt>
-6. After installation is complete, run <python main.py> to start the fastAPI server
+6. After installation is complete, run "python main.py" to start the fastAPI server
 
 PART 2 - NODEJS FRONTEND
 
 7. Have Node.js service installed on PC(or install it online)
 8. Open cmd/terminal in the frontend folder so that it shows /Projects/ParkingPrediction/frontend
 9. Run <npm install --force> and wait for installations
-10. Run <npm run dev> to launch front end.
+10. Run "npm run dev" to launch front end.
 10. Open website with link or at 0.0.0.0:3000 OR http://localhost:3000/
