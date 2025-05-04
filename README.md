@@ -9,7 +9,8 @@ PART 1 - SET UP YOUR VENV AND INSTALL REQUIREMENTS - FASTAPI
 - ALT - Do nothing and just using global python 3.12 version
 4. Initialize the venv using the cmd by running <./.venv/Scripts/Activate.ps1>
 5. We should still be in the \backend folder, run <pip install -r requirements.txt>
-6. After installation is complete, run "python main.py" to start the fastAPI server
+6. Place given .env file with API key inside the root directory /ParkingPrediction
+7. After installation is complete, run "python main.py" to start the fastAPI server
 
 PART 2 - NODEJS FRONTEND
 
