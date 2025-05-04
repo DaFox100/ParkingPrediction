@@ -179,6 +179,7 @@ export default function DetailedGarageChart({ data, selectedDate, isTodayMode, o
             <Bar dataKey="actualOccupancy" radius={[4, 4, 0, 0]}>
               {formattedData.map((entry, index) => {
                 const isForecast = entry.forecast || (isToday && entry.time > currentHourStr)
+                const isCurrentHour = isToday && entry.time === currentHourStr
                 const isHighOccupancy = entry.actualOccupancy >= 90
                 const isMediumOccupancy = entry.actualOccupancy >= 80 && entry.actualOccupancy < 90
                 
@@ -189,10 +190,13 @@ export default function DetailedGarageChart({ data, selectedDate, isTodayMode, o
                   fillColor = isToday ? "#f97316" : "#7c2d12" // orange or dark orange
                 }
 
+                // If it's the current hour and we don't have data yet, use the predicted value
+                const shouldUsePredicted = isCurrentHour && entry.actualOccupancy === 0 && entry.predictedOccupancy !== null
+
                 return (
                   <Cell 
                     key={`cell-${index}`} 
-                    fill={isForecast ? "url(#pattern-forecast)" : fillColor} 
+                    fill={isForecast || shouldUsePredicted ? "url(#pattern-forecast)" : fillColor} 
                   />
                 )
               })}
