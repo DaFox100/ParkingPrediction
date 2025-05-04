@@ -11,13 +11,16 @@ export default function ParkingDashboard() {
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState<string>("")
   const [availableDates, setAvailableDates] = useState<string[]>([])
+  const [isTodayMode, setIsTodayMode] = useState(true)
 
   useEffect(() => {
     async function loadDates() {
       const dates = await getAvailableDates()
-      setAvailableDates(dates)
-      if (dates.length > 0) {
-        setSelectedDate(dates[dates.length - 1]) // Set to latest date by default
+      // Sort dates in descending order (newest first)
+      const sortedDates = dates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
+      setAvailableDates(sortedDates)
+      if (sortedDates.length > 0) {
+        setSelectedDate(sortedDates[0]) // Set to most recent date by default
       }
     }
     loadDates()
@@ -57,6 +60,18 @@ export default function ParkingDashboard() {
     }
   }
 
+  const handleModeChange = (mode: 'today' | 'historical') => {
+    if (availableDates.length < 2) return
+
+    if (mode === 'today') {
+      setIsTodayMode(true)
+      setSelectedDate(availableDates[0]) // Most recent date
+    } else {
+      setIsTodayMode(false)
+      setSelectedDate(availableDates[1]) // Second most recent date
+    }
+  }
+
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto flex justify-center items-center h-64">
@@ -83,6 +98,8 @@ export default function ParkingDashboard() {
               selectedDate={selectedDate}
               onDateChange={setSelectedDate}
               availableDates={availableDates}
+              isTodayMode={isTodayMode}
+              onModeChange={handleModeChange}
             />
           </div>
         ))}

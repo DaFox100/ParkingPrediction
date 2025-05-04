@@ -19,13 +19,14 @@ import { formatTime } from "@/lib/utils"
 interface DetailedGarageChartProps {
   data: HourlyData[]
   selectedDate: string
+  isTodayMode: boolean
+  onModeChange: (mode: 'today' | 'historical') => void
 }
 
-export default function DetailedGarageChart({ data, selectedDate }: DetailedGarageChartProps) {
+export default function DetailedGarageChart({ data, selectedDate, isTodayMode, onModeChange }: DetailedGarageChartProps) {
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const isToday = selectedDate === todayStr
-  const viewMode = isToday ? "today" : "historical"
 
   // Find the highest occupancy point to highlight
   const maxOccupancy = data.reduce((max, point) => (point.occupancy > max.occupancy ? point : max), data[0])
@@ -45,12 +46,14 @@ export default function DetailedGarageChart({ data, selectedDate }: DetailedGara
       <div className="flex justify-end mb-4">
         <div className="flex rounded-md overflow-hidden">
           <button
-            className={`px-4 py-2 cursor-default ${viewMode === "today" ? "bg-blue-600" : "bg-[#333842]"}`}
+            className={`px-4 py-2 ${isTodayMode ? "bg-blue-600" : "bg-[#333842] hover:bg-[#3b82f6]"} transition-colors`}
+            onClick={() => onModeChange('today')}
           >
             Today
           </button>
           <button
-            className={`px-4 py-2 cursor-default ${viewMode === "historical" ? "bg-blue-600" : "bg-[#333842]"}`}
+            className={`px-4 py-2 ${!isTodayMode ? "bg-blue-600" : "bg-[#333842] hover:bg-[#3b82f6]"} transition-colors`}
+            onClick={() => onModeChange('historical')}
           >
             Historical
           </button>
@@ -87,15 +90,15 @@ export default function DetailedGarageChart({ data, selectedDate }: DetailedGara
             />
             <Bar dataKey="occupancy" radius={[4, 4, 0, 0]}>
               {formattedData.map((entry, index) => {
-                const isForecast = entry.forecast || (viewMode === "today" && entry.time > currentHourStr)
+                const isForecast = entry.forecast || (isToday && entry.time > currentHourStr)
                 const isHighOccupancy = entry.occupancy >= 90
                 const isMediumOccupancy = entry.occupancy >= 80 && entry.occupancy < 90
                 
-                let fillColor = viewMode === "today" ? "#3b82f6" : "#4b5563" // blue or gray
+                let fillColor = isToday ? "#3b82f6" : "#4b5563" // blue or gray
                 if (isHighOccupancy) {
-                  fillColor = viewMode === "today" ? "#ef4444" : "#7f1d1d" // red or dark red
+                  fillColor = isToday ? "#ef4444" : "#7f1d1d" // red or dark red
                 } else if (isMediumOccupancy) {
-                  fillColor = viewMode === "today" ? "#f97316" : "#7c2d12" // orange or dark orange
+                  fillColor = isToday ? "#f97316" : "#7c2d12" // orange or dark orange
                 }
 
                 return (
@@ -106,7 +109,7 @@ export default function DetailedGarageChart({ data, selectedDate }: DetailedGara
                 )
               })}
             </Bar>
-            {viewMode === "today" && (
+            {isToday && (
               <ReferenceLine
                 x={formatTime(currentHourStr)}
                 stroke="#ffffff"

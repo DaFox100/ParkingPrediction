@@ -15,6 +15,8 @@ interface ParkingGarageCardProps {
   selectedDate: string
   onDateChange: (date: string) => void
   availableDates: string[]
+  isTodayMode: boolean
+  onModeChange: (mode: 'today' | 'historical') => void
 }
 
 export default function ParkingGarageCard({ 
@@ -24,11 +26,17 @@ export default function ParkingGarageCard({
   onRefresh,
   selectedDate,
   onDateChange,
-  availableDates
+  availableDates,
+  isTodayMode,
+  onModeChange
 }: ParkingGarageCardProps) {
   const { id, name, currentOccupancy, trend, trendDirection, nextHour } = garage
   const [garageData, setGarageData] = useState(garage)
   const [isLoading, setIsLoading] = useState(false)
+
+  const today = new Date()
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const isToday = selectedDate === todayStr
 
   useEffect(() => {
     setGarageData(garage)
@@ -52,11 +60,13 @@ export default function ParkingGarageCard({
           <h2 className="text-2xl md:text-3xl">{name}</h2>
           {isExpanded && (
             <div className="flex items-center gap-2 ml-auto">
-              <p className="text-4xl md:text-5xl leading-none">{garageData.currentOccupancy}%</p>
-              <p className={`text-xl md:text-2xl ${garageData.trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
-                {garageData.trendDirection === "down" ? "-" : "+"}
-                {Math.abs(garageData.trend)}% next hour
-              </p>
+              <p className={`text-4xl md:text-5xl leading-none ${!isToday ? "text-gray-400" : ""}`}>{garageData.currentOccupancy}%</p>
+              {isToday && (
+                <p className={`text-xl md:text-2xl ${garageData.trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
+                  {garageData.trendDirection === "down" ? "-" : "+"}
+                  {Math.abs(garageData.trend)}% next hour
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -65,11 +75,13 @@ export default function ParkingGarageCard({
           <div className="flex justify-between items-end mt-4">
             <div className="flex items-center gap-1">
               <div>
-                <p className="text-7xl md:text-8xl mb-2 leading-none">{garageData.currentOccupancy}%</p>
-                <p className={`text-2xl md:text-3xl ${garageData.trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
-                  {garageData.trendDirection === "down" ? "-" : "+"}
-                  {Math.abs(garageData.trend)}% next hour
-                </p>
+                <p className={`text-7xl md:text-8xl mb-2 leading-none ${!isToday ? "text-gray-400" : ""}`}>{garageData.currentOccupancy}%</p>
+                {isToday && (
+                  <p className={`text-2xl md:text-3xl ${garageData.trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
+                    {garageData.trendDirection === "down" ? "-" : "+"}
+                    {Math.abs(garageData.trend)}% next hour
+                  </p>
+                )}
               </div>
               <div className="w-60 h-32 relative ml-4 mb-10">
                 <TrendChart 
@@ -125,7 +137,12 @@ export default function ParkingGarageCard({
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
             </div>
           ) : (
-            <DetailedGarageChart data={garageData.hourlyData} selectedDate={selectedDate} />
+            <DetailedGarageChart 
+              data={garageData.hourlyData} 
+              selectedDate={selectedDate} 
+              isTodayMode={isTodayMode}
+              onModeChange={onModeChange}
+            />
           )}
         </div>
       </div>
