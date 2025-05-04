@@ -62,12 +62,23 @@ export default function ParkingGarageCard({
           <h2 className="text-2xl md:text-3xl">{name}</h2>
           {isExpanded && (
             <div className="flex items-center gap-2 ml-auto">
-              <p className={`text-4xl md:text-5xl leading-none ${!isToday ? "text-gray-400" : ""}`}>{garageData.currentOccupancy}%</p>
-              {isToday && (
-                <p className={`text-xl md:text-2xl ${garageData.trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
-                  {garageData.trendDirection === "down" ? "-" : "+"}
-                  {Math.abs(garageData.trend)}% next hour
-                </p>
+              {garageData.currentOccupancy === -1 ? (
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="w-8 h-8 text-gray-400 animate-spin" />
+                  <p className="text-xl text-gray-400">Loading...</p>
+                </div>
+              ) : (
+                <>
+                  <p className={`text-4xl md:text-5xl leading-none ${!isToday ? "text-gray-400" : ""}`}>{garageData.currentOccupancy}%</p>
+                  {isToday ? (
+                    <p className={`text-xl md:text-2xl ${garageData.trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
+                      {garageData.trendDirection === "down" ? "-" : "+"}
+                      {Math.abs(garageData.trend)}% next hour
+                    </p>
+                  ) : (
+                    <p className="text-xl md:text-2xl text-gray-400">Historical Mode</p>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -77,12 +88,23 @@ export default function ParkingGarageCard({
           <div className="flex justify-between items-end mt-4">
             <div className="flex items-center gap-1">
               <div>
-                <p className={`text-7xl md:text-8xl mb-2 leading-none ${!isToday ? "text-gray-400" : ""}`}>{garageData.currentOccupancy}%</p>
-                {isToday && (
-                  <p className={`text-2xl md:text-3xl ${garageData.trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
-                    {garageData.trendDirection === "down" ? "-" : "+"}
-                    {Math.abs(garageData.trend)}% next hour
-                  </p>
+                {garageData.currentOccupancy === -1 ? (
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="w-12 h-12 text-gray-400 animate-spin" />
+                    <p className="text-2xl text-gray-400">Loading...</p>
+                  </div>
+                ) : (
+                  <>
+                    <p className={`text-7xl md:text-8xl mb-2 leading-none ${!isToday ? "text-gray-400" : ""}`}>{garageData.currentOccupancy}%</p>
+                    {isToday ? (
+                      <p className={`text-2xl md:text-3xl ${garageData.trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
+                        {garageData.trendDirection === "down" ? "-" : "+"}
+                        {Math.abs(garageData.trend)}% next hour
+                      </p>
+                    ) : (
+                      <p className="text-2xl md:text-3xl text-gray-400">Historical Mode</p>
+                    )}
+                  </>
                 )}
               </div>
               <div className="w-60 h-32 relative ml-4 mb-10">

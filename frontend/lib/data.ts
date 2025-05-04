@@ -63,15 +63,15 @@ export async function getParkingData(date?: string): Promise<GarageData[]> {
       }
     } catch (error) {
       console.error(`Error fetching data for ${id}:`, error)
-      // Return mock data if API fails
+      // Return error state instead of mock data
       return {
         id,
         name: names[garages.indexOf(id)],
-        currentOccupancy: 50,
+        currentOccupancy: -1, // Use -1 to indicate error state
         trend: 0,
         trendDirection: "up" as const,
         nextHour: "00:00",
-        trendData: generateTrendData(50, 0),
+        trendData: [],
         hourlyData: []
       }
     }
