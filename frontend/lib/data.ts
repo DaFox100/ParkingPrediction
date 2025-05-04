@@ -6,6 +6,11 @@ export async function getParkingData(date?: string): Promise<GarageData[]> {
   const garages = ['north', 'west', 'south', 'south_campus']
   const names = ['North', 'West', 'South', 'SouthCampus']
   
+  // Check if we're viewing today's data
+  const today = new Date()
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const isToday = selectedDate === todayStr
+  
   const garageDataPromises = garages.map(async (id) => {
     try {
       const response = await fetch(`http://127.0.0.1:8000/api/data?date=${selectedDate}&garage_id=${id}`)
@@ -14,15 +19,26 @@ export async function getParkingData(date?: string): Promise<GarageData[]> {
       }
       const data = await response.json()
       
+      // Get predictions for this garage only if viewing today's data
+      const predictions = isToday ? await getPredictions(id) : null
+      
       // Convert hourly values to the format expected by the frontend
-      const hourlyData = data.hourly_values.map((value: number | null, index: number) => ({
-        time: `${index.toString().padStart(2, '0')}:00`,
-        occupancy: value || 0,
-        forecast: false,
-        rawData: data.raw_data.filter((point: RawDataPoint) => 
-          point.time.startsWith(`${index.toString().padStart(2, '0')}:`)
-        )
-      }))
+      const hourlyData = data.hourly_values.map((value: number | null, index: number) => {
+        const hour = index.toString().padStart(2, '0')
+        const time = `${hour}:00`
+        const isFuture = isToday && new Date().getHours() < index
+        const occupancy = value !== null ? value : (isFuture && predictions ? predictions[index] : 0)
+        
+        return {
+          time,
+          occupancy,
+          predictedOccupancy: predictions ? predictions[index] : null,
+          forecast: isFuture,
+          rawData: data.raw_data.filter((point: RawDataPoint) => 
+            point.time.startsWith(`${hour}:`)
+          )
+        }
+      })
       
       // Calculate current occupancy and trend
       const currentHour = new Date().getHours()
@@ -114,4 +130,32 @@ function generateTrendData(current: number, trend: number) {
   }
 
   return data
+}
+
+// Get the latest update timestamp from the API
+export async function getLatestUpdate(): Promise<string> {
+  try {
+    const response = await fetch('http://127.0.0.1:8000/api/latest-update')
+    if (!response.ok) {
+      throw new Error('Failed to fetch latest update timestamp')
+    }
+    const data = await response.json()
+    return data.timestamp
+  } catch (error) {
+    console.error('Error fetching latest update timestamp:', error)
+    return new Date().toISOString() // Return current time as fallback
+  }
+}
+
+export async function getPredictions(garageId: string): Promise<number[]> {
+  try {
+    const response = await fetch(`http://127.0.0.1:8000/api/predictions/${garageId}`)
+    if (!response.ok) {
+      throw new Error(`Failed to fetch predictions for ${garageId}`)
+    }
+    return await response.json()
+  } catch (error) {
+    console.error(`Error fetching predictions for ${garageId}:`, error)
+    return Array(24).fill(0) // Return zeros as fallback
+  }
 }

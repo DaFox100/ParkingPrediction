@@ -18,6 +18,7 @@ export interface RawDataPoint {
 export interface HourlyData {
   time: string
   occupancy: number
+  predictedOccupancy?: number
   forecast?: boolean
   rawData?: RawDataPoint[]
 }

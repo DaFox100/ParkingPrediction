@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
-from keras_model_file import train_model
+from data.forecasting.keras_model_file import train_model
 from sklearn.preprocessing import MinMaxScaler
 
-from constants import (
+from data.forecasting.constants import (
     LOGS_DIRECTORY
 )
 

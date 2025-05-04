@@ -11,13 +11,16 @@ export default function ParkingDashboard() {
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState<string>("")
   const [availableDates, setAvailableDates] = useState<string[]>([])
+  const [isTodayMode, setIsTodayMode] = useState(true)
 
   useEffect(() => {
     async function loadDates() {
       const dates = await getAvailableDates()
-      setAvailableDates(dates)
-      if (dates.length > 0) {
-        setSelectedDate(dates[dates.length - 1]) // Set to latest date by default
+      // Sort dates in descending order (newest first)
+      const sortedDates = dates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
+      setAvailableDates(sortedDates)
+      if (sortedDates.length > 0) {
+        setSelectedDate(sortedDates[0]) // Set to most recent date by default
       }
     }
     loadDates()
@@ -27,9 +30,14 @@ export default function ParkingDashboard() {
     async function loadData() {
       if (selectedDate) {
         setLoading(true)
-        const data = await getParkingData(selectedDate)
-        setParkingData(data)
-        setLoading(false)
+        try {
+          const data = await getParkingData(selectedDate)
+          setParkingData(data)
+        } catch (error) {
+          console.error('Error loading parking data:', error)
+        } finally {
+          setLoading(false)
+        }
       }
     }
 
@@ -42,9 +50,26 @@ export default function ParkingDashboard() {
 
   const handleRefresh = async () => {
     setLoading(true)
-    const data = await getParkingData(selectedDate)
-    setParkingData(data)
-    setLoading(false)
+    try {
+      const data = await getParkingData(selectedDate)
+      setParkingData(data)
+    } catch (error) {
+      console.error('Error refreshing parking data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleModeChange = (mode: 'today' | 'historical') => {
+    if (availableDates.length < 2) return
+
+    if (mode === 'today') {
+      setIsTodayMode(true)
+      setSelectedDate(availableDates[0]) // Most recent date
+    } else {
+      setIsTodayMode(false)
+      setSelectedDate(availableDates[1]) // Second most recent date
+    }
   }
 
   if (loading) {
@@ -56,18 +81,29 @@ export default function ParkingDashboard() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4">
-      {parkingData.map((garage) => (
-        <ParkingGarageCard
-          key={garage.id}
-          garage={garage}
-          isExpanded={expandedGarageId === garage.id}
-          onGarageClick={handleGarageClick}
-          onRefresh={handleRefresh}
-          selectedDate={selectedDate}
-          onDateChange={setSelectedDate}
-        />
-      ))}
+    <div className="max-w-6xl mx-auto relative">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {parkingData.map((garage) => (
+          <div
+            key={garage.id}
+            className={`transition-all duration-500 ease-in-out ${
+              expandedGarageId && expandedGarageId !== garage.id ? "hidden pointer-events-none" : ""
+            } ${expandedGarageId === garage.id ? "md:col-span-2 row-span-2 absolute top-0 left-0 right-0" : ""}`}
+          >
+            <ParkingGarageCard
+              garage={garage}
+              isExpanded={expandedGarageId === garage.id}
+              onGarageClick={handleGarageClick}
+              onRefresh={handleRefresh}
+              selectedDate={selectedDate}
+              onDateChange={setSelectedDate}
+              availableDates={availableDates}
+              isTodayMode={isTodayMode}
+              onModeChange={handleModeChange}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

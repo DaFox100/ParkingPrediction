@@ -1,13 +1,44 @@
 from fastapi import APIRouter, HTTPException
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 from pydantic import BaseModel
-from modules.database import get_garage_data, get_available_dates, get_data_per_hour
+from modules.database import get_garage_data, get_available_dates, get_data_per_hour, get_latest_timestamp
+from fastapi.concurrency import run_in_threadpool
+from pathlib import Path
+import sys
+
+
+project_root = Path(__file__).parent.parent.parent
+sys.path.append(str(project_root))
+
+from modules.database import get_garage_data, get_available_dates, get_data_per_hour, get_latest_timestamp
+from data.forecasting.predict_future_times_individual_garage import calculate_prediction
+
+
 
 router = APIRouter(
     prefix="/api",
     tags=["data"]
 )
+
+# Global variables to store predictions for each garage
+north_predictions: List[int] = []
+south_predictions: List[int] = []
+west_predictions: List[int] = []
+south_campus_predictions: List[int] = []
+
+async def update_prediction():
+    """Update the global prediction variables with new predictions."""
+    global north_predictions, south_predictions, west_predictions, south_campus_predictions
+    
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    garage_predictions = await run_in_threadpool(calculate_prediction, today)
+    
+    # Store predictions in global variables
+    north_predictions = garage_predictions[2]
+    south_predictions = garage_predictions[0]
+    west_predictions = garage_predictions[1]
+    south_campus_predictions = garage_predictions[3]
 
 # Response model that returns the raw data
 class DataResponse(BaseModel):
@@ -61,3 +92,36 @@ async def get_data(date: str = datetime.now().strftime("%Y-%m-%d"), garage_id: s
 async def get_dates():
     # Get a list of all dates available in the database
     return await get_available_dates()
+
+@router.get("/latest-update")
+async def get_latest_update():
+    """
+    Get the timestamp of the most recent data update.
+    
+    Returns:
+        dict: Dictionary containing the latest update timestamp
+    """
+    latest_timestamp = await get_latest_timestamp()
+    if latest_timestamp:
+        return {"timestamp": latest_timestamp.isoformat()}
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail="No data available"
+        )
+
+@router.get("/predictions/{garage}")
+async def get_predictions(garage: str) -> List[float]:
+    """Get predictions for a specific garage."""
+    if garage == "north":
+        return north_predictions
+    elif garage == "south":
+        return south_predictions
+    elif garage == "west":
+        return west_predictions
+    elif garage == "south_campus":
+        return south_campus_predictions
+    else:
+        raise HTTPException(status_code=400, detail="Invalid garage name")
+
+

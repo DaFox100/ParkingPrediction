@@ -14,34 +14,76 @@ import {
   Cell,
 } from "recharts"
 import type { HourlyData } from "@/lib/types"
+import { formatTime } from "@/lib/utils"
 
 interface DetailedGarageChartProps {
   data: HourlyData[]
+  selectedDate: string
+  isTodayMode: boolean
+  onModeChange: (mode: 'today' | 'historical') => void
 }
 
-export default function DetailedGarageChart({ data }: DetailedGarageChartProps) {
-  const [viewMode, setViewMode] = useState<"today" | "historical">("today")
+export default function DetailedGarageChart({ data, selectedDate, isTodayMode, onModeChange }: DetailedGarageChartProps) {
+  const today = new Date()
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const isToday = selectedDate === todayStr
 
   // Find the highest occupancy point to highlight
   const maxOccupancy = data.reduce((max, point) => (point.occupancy > max.occupancy ? point : max), data[0])
 
   // Find current hour for reference line
   const currentHour = new Date().getHours()
-  const currentHourStr = `${currentHour.toString().padStart(2, "0")}:00`
+  const currentHourStr = `${currentHour.toString().padStart(2, '0')}:00`
+
+  // Format the data with AM/PM times
+  const formattedData = data.map(entry => ({
+    ...entry,
+    displayTime: formatTime(entry.time),
+    actualOccupancy: entry.occupancy,
+    predictedOccupancy: entry.predictedOccupancy ?? entry.occupancy
+  }))
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const entry = payload[0].payload
+      const isForecast = entry.forecast
+      const isCurrentHour = isToday && entry.time === currentHourStr
+      const isPastHour = isToday && entry.time < currentHourStr
+
+      return (
+        <div className="bg-[#1a1d24] p-3 border border-[#333842] rounded">
+          <p className="text-white text-2xl">{label}</p>
+          {isForecast ? (
+            <p className="text-blue-400 text-2xl">Predicted: {entry.predictedOccupancy}%</p>
+          ) : (isPastHour || isCurrentHour) ? (
+            <>
+              <p className="text-white text-2xl">Occupancy: {entry.actualOccupancy}%</p>
+              <p className="text-blue-400">Predicted: {entry.predictedOccupancy}%</p>
+              <p></p>
+              <p className="text-yellow-400">{entry.actualOccupancy - entry.predictedOccupancy}% Variance</p>
+            </>
+          ) : (
+            <p className="text-white">Occupancy: {entry.actualOccupancy}%</p>
+          )}
+        </div>
+      )
+    }
+    return null
+  }
 
   return (
     <div>
       <div className="flex justify-end mb-4">
         <div className="flex rounded-md overflow-hidden">
           <button
-            className={`px-4 py-2 ${viewMode === "today" ? "bg-blue-600" : "bg-[#333842]"}`}
-            onClick={() => setViewMode("today")}
+            className={`px-4 py-2 ${isTodayMode ? "bg-blue-600" : "bg-[#333842] hover:bg-[#3b82f6]"} transition-colors`}
+            onClick={() => onModeChange('today')}
           >
             Today
           </button>
           <button
-            className={`px-4 py-2 ${viewMode === "historical" ? "bg-blue-600" : "bg-[#333842]"}`}
-            onClick={() => setViewMode("historical")}
+            className={`px-4 py-2 ${!isTodayMode ? "bg-blue-600" : "bg-[#333842] hover:bg-[#3b82f6]"} transition-colors`}
+            onClick={() => onModeChange('historical')}
           >
             Historical
           </button>
@@ -50,7 +92,7 @@ export default function DetailedGarageChart({ data }: DetailedGarageChartProps) 
 
       <div className="h-[400px]">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+          <BarChart data={formattedData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
             <defs>
               <pattern
                 id="pattern-forecast"
@@ -63,34 +105,43 @@ export default function DetailedGarageChart({ data }: DetailedGarageChartProps) 
               </pattern>
             </defs>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333842" />
-            <XAxis dataKey="time" tick={{ fill: "#9ca3af" }} axisLine={{ stroke: "#333842" }} tickLine={false} />
-            <YAxis tick={{ fill: "#9ca3af" }} axisLine={{ stroke: "#333842" }} tickLine={false} domain={[0, 100]} />
-            <Tooltip
-              contentStyle={{ backgroundColor: "#1a1d24", borderColor: "#333842" }}
-              labelStyle={{ color: "white" }}
-              itemStyle={{ color: "white" }}
-              formatter={(value) => [`${value}%`, "Occupancy"]}
+            <XAxis 
+              dataKey="displayTime" 
+              tick={{ fill: "#9ca3af" }} 
+              axisLine={{ stroke: "#333842" }} 
+              tickLine={false} 
             />
-            <Bar dataKey="occupancy" radius={[4, 4, 0, 0]}>
-              {data.map((entry, index) => {
-                const isForecast = entry.forecast || (viewMode === "today" && entry.time > currentHourStr)
-                return <Cell key={`cell-${index}`} fill={isForecast ? "url(#pattern-forecast)" : "#3b82f6"} />
+            <YAxis tick={{ fill: "#9ca3af" }} axisLine={{ stroke: "#333842" }} tickLine={false} domain={[0, 100]} />
+            <Tooltip content={<CustomTooltip />} />
+            <Bar dataKey="actualOccupancy" radius={[4, 4, 0, 0]}>
+              {formattedData.map((entry, index) => {
+                const isForecast = entry.forecast || (isToday && entry.time > currentHourStr)
+                const isHighOccupancy = entry.actualOccupancy >= 90
+                const isMediumOccupancy = entry.actualOccupancy >= 80 && entry.actualOccupancy < 90
+                
+                let fillColor = isToday ? "#3b82f6" : "#4b5563" // blue or gray
+                if (isHighOccupancy) {
+                  fillColor = isToday ? "#ef4444" : "#7f1d1d" // red or dark red
+                } else if (isMediumOccupancy) {
+                  fillColor = isToday ? "#f97316" : "#7c2d12" // orange or dark orange
+                }
+
+                return (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={isForecast ? "url(#pattern-forecast)" : fillColor} 
+                  />
+                )
               })}
             </Bar>
-            {viewMode === "today" && (
+            {isToday && (
               <ReferenceLine
-                x={currentHourStr}
+                x={formatTime(currentHourStr)}
                 stroke="#ffffff"
                 strokeWidth={2}
                 label={<Label value="Current" position="top" fill="#ffffff" />}
               />
             )}
-            <ReferenceLine
-              x={maxOccupancy.time}
-              stroke="#ef4444"
-              strokeDasharray="3 3"
-              label={<Label value={`${maxOccupancy.time}\n${maxOccupancy.occupancy}%`} position="top" fill="#ef4444" />}
-            />
           </BarChart>
         </ResponsiveContainer>
       </div>

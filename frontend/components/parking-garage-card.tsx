@@ -5,7 +5,7 @@ import type { GarageData } from "@/lib/types"
 import TrendChart from "./trend-chart"
 import DetailedGarageChart from "./detailed-garage-chart"
 import { formatDate } from "@/lib/utils"
-import { getAvailableDates } from "@/lib/data"
+import { getAvailableDates, getGarageById } from "@/lib/data"
 
 interface ParkingGarageCardProps {
   garage: GarageData
@@ -14,6 +14,9 @@ interface ParkingGarageCardProps {
   onRefresh: () => void
   selectedDate: string
   onDateChange: (date: string) => void
+  availableDates: string[]
+  isTodayMode: boolean
+  onModeChange: (mode: 'today' | 'historical') => void
 }
 
 export default function ParkingGarageCard({ 
@@ -22,46 +25,74 @@ export default function ParkingGarageCard({
   onGarageClick, 
   onRefresh,
   selectedDate,
-  onDateChange
+  onDateChange,
+  availableDates,
+  isTodayMode,
+  onModeChange
 }: ParkingGarageCardProps) {
   const { id, name, currentOccupancy, trend, trendDirection, nextHour } = garage
-  const [availableDates, setAvailableDates] = useState<string[]>([])
+  const [garageData, setGarageData] = useState(garage)
+  const [isLoading, setIsLoading] = useState(false)
+
+  const today = new Date()
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const isToday = selectedDate === todayStr
 
   useEffect(() => {
-    async function loadDates() {
-      const dates = await getAvailableDates()
-      setAvailableDates(dates)
-    }
-    loadDates()
-  }, [])
+    setGarageData(garage)
+  }, [garage])
+
+  const handleDateChange = async (date: string) => {
+    onDateChange(date)
+  }
 
   return (
     <div
-      className={`bg-[#252830] rounded-lg transition-all duration-500 ease-in-out overflow-hidden
+      className={`bg-[#252830] rounded-3xl transition-all duration-500 ease-in-out overflow-hidden
         ${isExpanded ? "md:col-span-2 row-span-2" : ""}`}
     >
-      <div className="p-6 cursor-pointer hover:bg-[#2a2e38] transition-colors" onClick={() => onGarageClick(id)}>
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
-            <span className="text-xs text-white">P</span>
+      {/* DO NOT USE h-full, it will cause the card to not show chart */}
+      <div className="p-8 cursor-pointer hover:bg-[#2a2e38] transition-colors flex flex-col justify-between" onClick={() => onGarageClick(id)}>
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
+            <span className="text-lg text-white font-semibold">P</span>
           </div>
-          <h2 className="text-xl font-medium">{name}</h2>
+          <h2 className="text-2xl md:text-3xl">{name}</h2>
+          {isExpanded && (
+            <div className="flex items-center gap-2 ml-auto">
+              <p className={`text-4xl md:text-5xl leading-none ${!isToday ? "text-gray-400" : ""}`}>{garageData.currentOccupancy}%</p>
+              {isToday && (
+                <p className={`text-xl md:text-2xl ${garageData.trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
+                  {garageData.trendDirection === "down" ? "-" : "+"}
+                  {Math.abs(garageData.trend)}% next hour
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
-        <div className="flex justify-between items-end">
-          <div>
-            <p className="text-6xl font-bold mb-2">{currentOccupancy}%</p>
-            <p className={`text-lg ${trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
-              {trendDirection === "down" ? "-" : "+"}
-              {Math.abs(trend)}% next hour
-            </p>
+        {!isExpanded && (
+          <div className="flex justify-between items-end mt-4">
+            <div className="flex items-center gap-1">
+              <div>
+                <p className={`text-7xl md:text-8xl mb-2 leading-none ${!isToday ? "text-gray-400" : ""}`}>{garageData.currentOccupancy}%</p>
+                {isToday && (
+                  <p className={`text-2xl md:text-3xl ${garageData.trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
+                    {garageData.trendDirection === "down" ? "-" : "+"}
+                    {Math.abs(garageData.trend)}% next hour
+                  </p>
+                )}
+              </div>
+              <div className="w-60 h-32 relative ml-4 mb-10">
+                <TrendChart 
+                  rawData={garageData.hourlyData.flatMap(hour => hour.rawData || [])}
+                  predictions={garageData.hourlyData.map(hour => hour.occupancy)}
+                  direction={garageData.trendDirection} 
+                />
+              </div>
+            </div>
           </div>
-
-          <div className="w-32 h-16 relative">
-            <TrendChart data={garage.trendData} direction={trendDirection} />
-            <div className="absolute bottom-0 right-0 text-sm text-gray-400">{nextHour}</div>
-          </div>
-        </div>
+        )}
       </div>
 
       <div
@@ -70,14 +101,15 @@ export default function ParkingGarageCard({
       >
         <div className="p-6 pt-0 border-t border-[#333842] mt-2">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-semibold">{name} Garage</h2>
+            <h2 className="text-2xl">{name} Garage</h2>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 text-gray-400">
                 <Calendar size={18} />
                 <select
                   className="bg-[#1a1d24] text-gray-400 border border-[#333842] rounded px-2 py-1"
                   value={selectedDate}
-                  onChange={(e) => onDateChange(e.target.value)}
+                  onChange={(e) => handleDateChange(e.target.value)}
+                  disabled={isLoading}
                 >
                   {availableDates.map((date) => (
                     <option key={date} value={date}>
@@ -92,6 +124,7 @@ export default function ParkingGarageCard({
                   e.stopPropagation()
                   onRefresh()
                 }}
+                disabled={isLoading}
               >
                 <RefreshCw size={18} />
                 <span>Refresh</span>
@@ -99,7 +132,18 @@ export default function ParkingGarageCard({
             </div>
           </div>
 
-          <DetailedGarageChart data={garage.hourlyData} />
+          {isLoading ? (
+            <div className="flex justify-center items-center h-[400px]">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : (
+            <DetailedGarageChart 
+              data={garageData.hourlyData} 
+              selectedDate={selectedDate} 
+              isTodayMode={isTodayMode}
+              onModeChange={onModeChange}
+            />
+          )}
         </div>
       </div>
     </div>
