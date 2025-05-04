@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import ParkingGarageCard from "@/components/parking-garage-card"
-import { getParkingData, getAvailableDates } from "@/lib/data"
+import { getParkingData, getAvailableDates, getAverageFullness } from "@/lib/data"
 import type { GarageData } from "@/lib/types"
 
 export default function ParkingDashboard() {
@@ -12,6 +12,7 @@ export default function ParkingDashboard() {
   const [selectedDate, setSelectedDate] = useState<string>("")
   const [availableDates, setAvailableDates] = useState<string[]>([])
   const [isTodayMode, setIsTodayMode] = useState(true)
+  const [averageFullness, setAverageFullness] = useState<Record<string, number[]>>({})
 
   useEffect(() => {
     async function loadDates() {
@@ -26,6 +27,19 @@ export default function ParkingDashboard() {
     loadDates()
   }, [])
 
+  const fetchAverages = async (garages: GarageData[]) => {
+    const avgFullnessPromises = garages.map(async (garage) => {
+      const fullness = await getAverageFullness(garage.id, selectedDate)
+      return { id: garage.id, fullness }
+    })
+    const avgFullnessResults = await Promise.all(avgFullnessPromises)
+    const avgFullnessMap = avgFullnessResults.reduce((acc, { id, fullness }) => {
+      acc[id] = fullness
+      return acc
+    }, {} as Record<string, number[]>)
+    setAverageFullness(avgFullnessMap)
+  }
+
   useEffect(() => {
     async function loadData() {
       if (selectedDate) {
@@ -33,6 +47,7 @@ export default function ParkingDashboard() {
         try {
           const data = await getParkingData(selectedDate)
           setParkingData(data)
+          await fetchAverages(data)
         } catch (error) {
           console.error('Error loading parking data:', error)
         } finally {
@@ -53,6 +68,7 @@ export default function ParkingDashboard() {
     try {
       const data = await getParkingData(selectedDate)
       setParkingData(data)
+      await fetchAverages(data)
     } catch (error) {
       console.error('Error refreshing parking data:', error)
     } finally {
@@ -100,6 +116,7 @@ export default function ParkingDashboard() {
               availableDates={availableDates}
               isTodayMode={isTodayMode}
               onModeChange={handleModeChange}
+              averageFullness={averageFullness[garage.id] || []}
             />
           </div>
         ))}

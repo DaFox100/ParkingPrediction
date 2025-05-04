@@ -54,6 +54,12 @@ class Datapoint(BaseModel):
     north_status: int
     south_campus_status: int
 
+# Global variables to store average fullness per hour for each day of the week
+north_avg_fullness = [[] for _ in range(7)]  # 7 days, each containing 24 hours
+south_avg_fullness = [[] for _ in range(7)]
+west_avg_fullness = [[] for _ in range(7)]
+south_campus_avg_fullness = [[] for _ in range(7)]
+
 async def init_db():
     """Initialize the database and create time series collection if it doesn't exist"""
     try:
@@ -409,11 +415,7 @@ async def _aggregate_hourly_data_for_date(date_str: str):
 #         print("Datapoint deleted")
 #     asyncio.run(main())
 
-async def main():
-    await _aggregate_hourly_data_for_date("2025-05-02")
-    
-if __name__ == "__main__":
-    asyncio.run(main())
+
 
 async def get_latest_timestamp() -> datetime:
     """
@@ -425,3 +427,154 @@ async def get_latest_timestamp() -> datetime:
     global MOST_RECENT_TIMESTAMP
     return MOST_RECENT_TIMESTAMP
 
+async def calculate_average_fullness():
+    """
+    Calculate average fullness per hour for each day of the week for all garages.
+    Excludes December, June, and July data.
+    Skips weeks where Monday's South Garage data doesn't reach 70% fullness.
+    """
+    global north_avg_fullness, south_avg_fullness, west_avg_fullness, south_campus_avg_fullness
+    
+    # Reset the global variables
+    north_avg_fullness = [[] for _ in range(7)]
+    south_avg_fullness = [[] for _ in range(7)]
+    west_avg_fullness = [[] for _ in range(7)]
+    south_campus_avg_fullness = [[] for _ in range(7)]
+    
+    # Get all documents from hourly_aggregates collection
+    cursor = averaged_collection.find({"complete": True})
+    documents = await cursor.to_list(length=None)
+    
+    print(f"Checking {len(documents)} documents")
+    
+    # Group documents by week
+    weeks = {}
+    for doc in documents:
+        date = datetime.strptime(doc["day"], "%Y-%m-%d")
+        month = date.month
+        
+        # Skip December, June, and July
+        if month in [6, 7, 12]:
+            continue
+            
+        # Get the start of the week (Monday)
+        week_start = date - timedelta(days=date.weekday())
+        week_key = week_start.strftime("%Y-%m-%d")
+        
+        if week_key not in weeks:
+            weeks[week_key] = []
+        weeks[week_key].append(doc)
+    
+    # Keep track of included documents for counting
+    included_documents = []
+    
+    # Process each week
+    for week_docs in weeks.values():
+        # Check if this week should be included
+        should_include_week = False
+        
+        # Find Monday's South Garage data
+        for doc in week_docs:
+            date = datetime.strptime(doc["day"], "%Y-%m-%d")
+            if date.weekday() == 0 and doc["garage_id"] == 1:  # Monday and South Garage
+                values = doc["values"]
+                if any(value is not None and value >= 70 for value in values):
+                    should_include_week = True
+                    break
+        
+        if not should_include_week:
+            continue
+        
+        # Add all documents from this week to included_documents
+        included_documents.extend(week_docs)
+        
+        # Process documents for this week
+        for doc in week_docs:
+            date = datetime.strptime(doc["day"], "%Y-%m-%d")
+            day_of_week = date.weekday()
+            garage_id = doc["garage_id"]
+            values = doc["values"]
+            
+            # Initialize lists for this day if not already done
+            if not north_avg_fullness[day_of_week]:
+                north_avg_fullness[day_of_week] = [0] * 24
+            if not south_avg_fullness[day_of_week]:
+                south_avg_fullness[day_of_week] = [0] * 24
+            if not west_avg_fullness[day_of_week]:
+                west_avg_fullness[day_of_week] = [0] * 24
+            if not south_campus_avg_fullness[day_of_week]:
+                south_campus_avg_fullness[day_of_week] = [0] * 24
+            
+            # Add values to appropriate garage's list
+            if garage_id == 1:  # South
+                for i, value in enumerate(values):
+                    if value is not None:
+                        south_avg_fullness[day_of_week][i] += value
+            elif garage_id == 2:  # West
+                for i, value in enumerate(values):
+                    if value is not None:
+                        west_avg_fullness[day_of_week][i] += value
+            elif garage_id == 3:  # North
+                for i, value in enumerate(values):
+                    if value is not None:
+                        north_avg_fullness[day_of_week][i] += value
+            elif garage_id == 4:  # South Campus
+                for i, value in enumerate(values):
+                    if value is not None:
+                        south_campus_avg_fullness[day_of_week][i] += value
+    
+    print(f"Calculating averages")
+    print(f"Total included documents: {len(included_documents)}")
+    
+    # Calculate averages for each garage using only included documents
+    for day in range(7):
+        # Count number of documents for each day from included documents
+        north_count = len([d for d in included_documents if datetime.strptime(d["day"], "%Y-%m-%d").weekday() == day and d["garage_id"] == 3])
+        south_count = len([d for d in included_documents if datetime.strptime(d["day"], "%Y-%m-%d").weekday() == day and d["garage_id"] == 1])
+        west_count = len([d for d in included_documents if datetime.strptime(d["day"], "%Y-%m-%d").weekday() == day and d["garage_id"] == 2])
+        south_campus_count = len([d for d in included_documents if datetime.strptime(d["day"], "%Y-%m-%d").weekday() == day and d["garage_id"] == 4])
+        
+        print(f"Day {day} counts - North: {north_count}, South: {south_count}, West: {west_count}, South Campus: {south_campus_count}")
+        
+        # Calculate averages
+        if north_count > 0:
+            north_avg_fullness[day] = [round(x / north_count) for x in north_avg_fullness[day]]
+        if south_count > 0:
+            south_avg_fullness[day] = [round(x / south_count) for x in south_avg_fullness[day]]
+        if west_count > 0:
+            west_avg_fullness[day] = [round(x / west_count) for x in west_avg_fullness[day]]
+        if south_campus_count > 0:
+            south_campus_avg_fullness[day] = [round(x / south_campus_count) for x in south_campus_avg_fullness[day]]
+    
+    print(f"Averages calculated")
+    print(f"North: {north_avg_fullness[0]}")
+    print(f"South: {south_avg_fullness[0]}")
+    print(f"West: {west_avg_fullness[0]}")
+    print(f"South Campus: {south_campus_avg_fullness[0]}")
+
+async def main():
+    await calculate_average_fullness()
+    
+if __name__ == "__main__":
+    asyncio.run(main())
+
+async def get_garage_averages(garage: str) -> List[List[int]]:
+    """
+    Get the average fullness data for a specific garage.
+    
+    Args:
+        garage (str): Garage name (north, south, west, south_campus)
+        
+    Returns:
+        List[List[int]]: List of 7 lists (one for each day) containing 24 hourly averages
+    """
+    if garage == "north":
+        return north_avg_fullness
+    elif garage == "south":
+        return south_avg_fullness
+    elif garage == "west":
+        return west_avg_fullness
+    elif garage == "south_campus":
+        return south_campus_avg_fullness
+    else:
+        raise ValueError(f"Invalid garage name: {garage}")

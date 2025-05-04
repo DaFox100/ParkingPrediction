@@ -5,7 +5,7 @@ import type { GarageData } from "@/lib/types"
 import TrendChart from "./trend-chart"
 import DetailedGarageChart from "./detailed-garage-chart"
 import { formatDate } from "@/lib/utils"
-import { getAvailableDates, getGarageById } from "@/lib/data"
+import { getAvailableDates, getGarageById, getAverageFullness } from "@/lib/data"
 
 interface ParkingGarageCardProps {
   garage: GarageData
@@ -17,6 +17,7 @@ interface ParkingGarageCardProps {
   availableDates: string[]
   isTodayMode: boolean
   onModeChange: (mode: 'today' | 'historical') => void
+  averageFullness: number[]
 }
 
 export default function ParkingGarageCard({ 
@@ -28,7 +29,8 @@ export default function ParkingGarageCard({
   onDateChange,
   availableDates,
   isTodayMode,
-  onModeChange
+  onModeChange,
+  averageFullness
 }: ParkingGarageCardProps) {
   const { id, name, currentOccupancy, trend, trendDirection, nextHour } = garage
   const [garageData, setGarageData] = useState(garage)
@@ -142,6 +144,7 @@ export default function ParkingGarageCard({
               selectedDate={selectedDate} 
               isTodayMode={isTodayMode}
               onModeChange={onModeChange}
+              averageFullness={averageFullness}
             />
           )}
         </div>

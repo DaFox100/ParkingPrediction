@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   BarChart,
   Bar,
@@ -21,9 +21,10 @@ interface DetailedGarageChartProps {
   selectedDate: string
   isTodayMode: boolean
   onModeChange: (mode: 'today' | 'historical') => void
+  averageFullness: number[]
 }
 
-export default function DetailedGarageChart({ data, selectedDate, isTodayMode, onModeChange }: DetailedGarageChartProps) {
+export default function DetailedGarageChart({ data, selectedDate, isTodayMode, onModeChange, averageFullness }: DetailedGarageChartProps) {
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const isToday = selectedDate === todayStr
@@ -49,21 +50,32 @@ export default function DetailedGarageChart({ data, selectedDate, isTodayMode, o
       const isForecast = entry.forecast
       const isCurrentHour = isToday && entry.time === currentHourStr
       const isPastHour = isToday && entry.time < currentHourStr
+      const hourIndex = parseInt(entry.time.split(':')[0])
+      const average = averageFullness[hourIndex]
+      const variance = entry.actualOccupancy - entry.predictedOccupancy
+      const varianceText = variance > 0 ? `(+${variance}%)` : `(${variance}%)`
 
       return (
         <div className="bg-[#1a1d24] p-3 border border-[#333842] rounded">
           <p className="text-white text-2xl">{label}</p>
           {isForecast ? (
-            <p className="text-blue-400 text-2xl">Predicted: {entry.predictedOccupancy}%</p>
+            <>
+              <p className="text-blue-400 text-2xl">Predicted: {entry.predictedOccupancy}%</p>
+              <p className="text-gray-400">Average: {average}%</p>
+            </>
           ) : (isPastHour || isCurrentHour) ? (
             <>
               <p className="text-white text-2xl">Occupancy: {entry.actualOccupancy}%</p>
-              <p className="text-blue-400">Predicted: {entry.predictedOccupancy}%</p>
-              <p></p>
-              <p className="text-yellow-400">{entry.actualOccupancy - entry.predictedOccupancy}% Variance</p>
+              <p className="text-blue-400">
+                Predicted: {entry.predictedOccupancy}% <span className="text-yellow-400">{varianceText}</span>
+              </p>
+              <p className="text-gray-400">Average: {average}%</p>
             </>
           ) : (
-            <p className="text-white">Occupancy: {entry.actualOccupancy}%</p>
+            <>
+              <p className="text-white text-2xl">Occupancy: {entry.actualOccupancy}%</p>
+              <p className="text-gray-400">Average: {average}%</p>
+            </>
           )}
         </div>
       )

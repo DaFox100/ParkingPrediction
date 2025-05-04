@@ -159,3 +159,19 @@ export async function getPredictions(garageId: string): Promise<number[]> {
     return Array(24).fill(0) // Return zeros as fallback
   }
 }
+
+export async function getAverageFullness(garageId: string, selectedDate: string): Promise<number[]> {
+  try {
+    const date = new Date(selectedDate)
+    const dayOfWeek = date.getDay() // 0 = Monday, 1 = Tuesday, etc.
+
+    const response = await fetch(`http://127.0.0.1:8000/api/average-fullness/${garageId}/${dayOfWeek}`)
+    if (!response.ok) {
+      throw new Error(`Failed to fetch average fullness for ${garageId}`)
+    }
+    return await response.json()
+  } catch (error) {
+    console.error(`Error fetching average fullness for ${garageId}:`, error)
+    return Array(24).fill(0) // Return zeros as fallback
+  }
+}

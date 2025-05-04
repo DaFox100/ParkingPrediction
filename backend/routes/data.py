@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from pydantic import BaseModel
-from modules.database import get_garage_data, get_available_dates, get_data_per_hour, get_latest_timestamp
+from modules.database import get_garage_data, get_available_dates, get_data_per_hour, get_latest_timestamp, get_garage_averages
 from fastapi.concurrency import run_in_threadpool
 from pathlib import Path
 import sys
@@ -123,5 +123,26 @@ async def get_predictions(garage: str) -> List[float]:
         return south_campus_predictions
     else:
         raise HTTPException(status_code=400, detail="Invalid garage name")
+
+@router.get("/average-fullness/{garage}/{day}")
+async def get_average_fullness(garage: str, day: int) -> List[int]:
+    """
+    Get average fullness per hour for a specific garage and day of the week.
+    
+    Args:
+        garage (str): Garage name (north, south, west, south_campus)
+        day (int): Day of week (0 = Monday, 6 = Sunday)
+        
+    Returns:
+        List[int]: List of 24 integers representing average fullness for each hour
+    """
+    if day < 0 or day > 6:
+        raise HTTPException(status_code=400, detail="Day must be between 0 (Monday) and 6 (Sunday)")
+    
+    try:
+        garage_averages = await get_garage_averages(garage)
+        return garage_averages[day]
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 

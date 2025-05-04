@@ -1,9 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from modules.database import init_db, init_available_dates, close_connection, _aggregate_hourly_data_for_date
+from modules.database import init_db, init_available_dates, close_connection, _aggregate_hourly_data_for_date, calculate_average_fullness
 from routes.data import router as data_router, update_prediction
 from datetime import datetime
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize MongoDB and available dates on startup
@@ -11,6 +12,7 @@ async def lifespan(app: FastAPI):
     await update_prediction()
     await init_available_dates()
     await _aggregate_hourly_data_for_date(datetime.now().strftime("%Y-%m-%d"))
+    await calculate_average_fullness()  # Calculate average fullness on startup
     yield
     
     # Close MongoDB connection on shutdown
