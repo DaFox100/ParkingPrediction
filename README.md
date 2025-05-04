@@ -15,8 +15,11 @@ PART 1 - SET UP YOUR VENV AND INSTALL REQUIREMENTS - FASTAPI
 
 PART 2 - NODEJS FRONTEND
 
-7. Have Node.js service installed on PC(or install it online)
-8. Open cmd/terminal in the frontend folder so that it shows /Projects/ParkingPrediction/frontend
-9. Run <npm install --force> and wait for installations
-10. Run "npm run dev" to launch front end.
-10. Open website with link or at 0.0.0.0:3000 OR http://localhost:3000/
+8. Have Node.js service installed on PC(or install it online)
+9. Open cmd/terminal in the frontend folder so that it shows /Projects/ParkingPrediction/frontend
+10. Run <npm install --force> and wait for installations
+11. Run "npm run dev" to launch front end.
+12. Open website with link or at 0.0.0.0:3000 OR http://localhost:3000/
+
+IMPORTANT NOTE - The backend takes a while to load, especially for the first time!
+The frontend will not work properly until the backend is fully loaded and shows that uvicorn is running on localhost
