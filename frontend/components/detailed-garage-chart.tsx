@@ -14,6 +14,7 @@ import {
   Cell,
 } from "recharts"
 import type { HourlyData } from "@/lib/types"
+import { formatTime } from "@/lib/utils"
 
 interface DetailedGarageChartProps {
   data: HourlyData[]
@@ -31,7 +32,13 @@ export default function DetailedGarageChart({ data, selectedDate }: DetailedGara
 
   // Find current hour for reference line
   const currentHour = new Date().getHours()
-  const currentHourStr = `${currentHour.toString().padStart(2, "0")}:00`
+  const currentHourStr = `${currentHour.toString().padStart(2, '0')}:00`
+
+  // Format the data with AM/PM times
+  const formattedData = data.map(entry => ({
+    ...entry,
+    displayTime: formatTime(entry.time)
+  }))
 
   return (
     <div>
@@ -52,7 +59,7 @@ export default function DetailedGarageChart({ data, selectedDate }: DetailedGara
 
       <div className="h-[400px]">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+          <BarChart data={formattedData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
             <defs>
               <pattern
                 id="pattern-forecast"
@@ -65,7 +72,12 @@ export default function DetailedGarageChart({ data, selectedDate }: DetailedGara
               </pattern>
             </defs>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333842" />
-            <XAxis dataKey="time" tick={{ fill: "#9ca3af" }} axisLine={{ stroke: "#333842" }} tickLine={false} />
+            <XAxis 
+              dataKey="displayTime" 
+              tick={{ fill: "#9ca3af" }} 
+              axisLine={{ stroke: "#333842" }} 
+              tickLine={false} 
+            />
             <YAxis tick={{ fill: "#9ca3af" }} axisLine={{ stroke: "#333842" }} tickLine={false} domain={[0, 100]} />
             <Tooltip
               contentStyle={{ backgroundColor: "#1a1d24", borderColor: "#333842" }}
@@ -74,24 +86,24 @@ export default function DetailedGarageChart({ data, selectedDate }: DetailedGara
               formatter={(value) => [`${value}%`, "Occupancy"]}
             />
             <Bar dataKey="occupancy" radius={[4, 4, 0, 0]}>
-              {data.map((entry, index) => {
+              {formattedData.map((entry, index) => {
                 const isForecast = entry.forecast || (viewMode === "today" && entry.time > currentHourStr)
                 return <Cell key={`cell-${index}`} fill={isForecast ? "url(#pattern-forecast)" : "#3b82f6"} />
               })}
             </Bar>
             {viewMode === "today" && (
               <ReferenceLine
-                x={currentHourStr}
+                x={formatTime(currentHourStr)}
                 stroke="#ffffff"
                 strokeWidth={2}
                 label={<Label value="Current" position="top" fill="#ffffff" />}
               />
             )}
             <ReferenceLine
-              x={maxOccupancy.time}
+              x={formatTime(maxOccupancy.time)}
               stroke="#ef4444"
               strokeDasharray="3 3"
-              label={<Label value={`${maxOccupancy.time}\n${maxOccupancy.occupancy}%`} position="top" fill="#ef4444" />}
+              label={<Label value={`${formatTime(maxOccupancy.time)}\n${maxOccupancy.occupancy}%`} position="top" fill="#ef4444" />}
             />
           </BarChart>
         </ResponsiveContainer>

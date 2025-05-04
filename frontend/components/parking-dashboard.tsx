@@ -56,18 +56,26 @@ export default function ParkingDashboard() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4">
-      {parkingData.map((garage) => (
-        <ParkingGarageCard
-          key={garage.id}
-          garage={garage}
-          isExpanded={expandedGarageId === garage.id}
-          onGarageClick={handleGarageClick}
-          onRefresh={handleRefresh}
-          selectedDate={selectedDate}
-          onDateChange={setSelectedDate}
-        />
-      ))}
+    <div className="max-w-6xl mx-auto relative">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {parkingData.map((garage) => (
+          <div
+            key={garage.id}
+            className={`transition-all duration-500 ease-in-out ${
+              expandedGarageId && expandedGarageId !== garage.id ? "hidden pointer-events-none" : ""
+            } ${expandedGarageId === garage.id ? "md:col-span-2 row-span-2 absolute top-0 left-0 right-0" : ""}`}
+          >
+            <ParkingGarageCard
+              garage={garage}
+              isExpanded={expandedGarageId === garage.id}
+              onGarageClick={handleGarageClick}
+              onRefresh={handleRefresh}
+              selectedDate={selectedDate}
+              onDateChange={setSelectedDate}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

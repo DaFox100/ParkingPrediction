@@ -41,28 +41,43 @@ export default function ParkingGarageCard({
         ${isExpanded ? "md:col-span-2 row-span-2" : ""}`}
     >
       {/* DO NOT USE h-full, it will cause the card to not show chart */}
-      <div className="p-8 cursor-pointer hover:bg-background transition-colors flex flex-col justify-between" onClick={() => onGarageClick(id)}>
-        <div className="flex items-center gap-4 mb-4">
+      <div className="p-8 cursor-pointer hover:bg-[#2a2e38] transition-colors flex flex-col justify-between" onClick={() => onGarageClick(id)}>
+        <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
             <span className="text-lg text-white font-semibold">P</span>
           </div>
           <h2 className="text-2xl md:text-3xl">{name}</h2>
+          {isExpanded && (
+            <div className="flex items-center gap-2 ml-auto">
+              <p className="text-4xl md:text-5xl leading-none">{currentOccupancy}%</p>
+              <p className={`text-xl md:text-2xl ${trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
+                {trendDirection === "down" ? "-" : "+"}
+                {Math.abs(trend)}% next hour
+              </p>
+            </div>
+          )}
         </div>
 
-        <div className="flex justify-between items-end">
-          <div>
-            <p className="text-7xl md:text-8xl mb-2 leading-none">{currentOccupancy}%</p>
-            <p className={`text-2xl md:text-3xl ${trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
-              {trendDirection === "down" ? "-" : "+"}
-              {Math.abs(trend)}% next hour
-            </p>
+        {!isExpanded && (
+          <div className="flex justify-between items-end mt-4">
+            <div className="flex items-center gap-1">
+              <div>
+                <p className="text-7xl md:text-8xl mb-2 leading-none">{currentOccupancy}%</p>
+                <p className={`text-2xl md:text-3xl ${trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
+                  {trendDirection === "down" ? "-" : "+"}
+                  {Math.abs(trend)}% next hour
+                </p>
+              </div>
+              <div className="w-60 h-32 relative ml-4 mb-10">
+                <TrendChart 
+                  rawData={garage.hourlyData.flatMap(hour => hour.rawData || [])}
+                  predictions={garage.hourlyData.map(hour => hour.occupancy)}
+                  direction={trendDirection} 
+                />
+              </div>
+            </div>
           </div>
-
-          <div className="w-36 h-20 relative">
-            <TrendChart data={garage.trendData} direction={trendDirection} />
-            <div className="absolute bottom-0 right-0 text-base text-gray-400">{nextHour}</div>
-          </div>
-        </div>
+        )}
       </div>
 
       <div
