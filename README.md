@@ -1,5 +1,7 @@
 # HOW TO RUN
 
+Environment: Windows(Linux would use the its corresponding console commands)
+
 PART 1 - SET UP YOUR VENV AND INSTALL REQUIREMENTS - FASTAPI
 
 1. Have python 3.12 installed on your system
@@ -23,3 +25,5 @@ PART 2 - NODEJS FRONTEND
 
 IMPORTANT NOTE - The backend takes a while to load, especially for the first time!
 The frontend will not work properly until the backend is fully loaded and shows that uvicorn is running on localhost
+
+
