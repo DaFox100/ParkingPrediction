@@ -3,8 +3,9 @@
 PART 1 - SET UP YOUR VENV AND INSTALL REQUIREMENTS - FASTAPI
 
 1. Have python 3.12 installed on your system
-2. Open cmd in backend so that it shows /Projects/ParkingPrediction/backend (or use cd to navigate directories)
-3. Create a .venv using <python -m venv .venv>(if python 3.12 is your default)
+2. Have MongoDB installed on your system, get it here https://www.mongodb.com/try/download/community
+3. Open cmd in backend so that it shows /Projects/ParkingPrediction/backend (or use cd to navigate directories)
+4. Create a .venv using <python -m venv .venv>(if python 3.12 is your default)
 - ALT - Create a .venv using <py -3.12 -m venv .venv>(if you have pylauncher and python 3.12)
 - ALT - Do nothing and just using global python 3.12 version
 4. Initialize the venv using the cmd by running <./.venv/Scripts/Activate.ps1>
