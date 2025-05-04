@@ -36,3 +36,6 @@
 
 .cursorignore
 TODO.txt
+
+# macOS
+.DS_Store
