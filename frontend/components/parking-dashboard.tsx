@@ -72,7 +72,7 @@ export default function ParkingDashboard() {
           <div
             key={garage.id}
             className={`transition-all duration-500 ease-in-out ${
-              expandedGarageId && expandedGarageId !== garage.id ? "opacity-0 invisible" : ""
+              expandedGarageId && expandedGarageId !== garage.id ? "hidden pointer-events-none" : ""
             } ${expandedGarageId === garage.id ? "md:col-span-2 row-span-2 absolute top-0 left-0 right-0" : ""}`}
           >
             <ParkingGarageCard
