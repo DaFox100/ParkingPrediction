@@ -27,9 +27,14 @@ export default function ParkingDashboard() {
     async function loadData() {
       if (selectedDate) {
         setLoading(true)
-        const data = await getParkingData(selectedDate)
-        setParkingData(data)
-        setLoading(false)
+        try {
+          const data = await getParkingData(selectedDate)
+          setParkingData(data)
+        } catch (error) {
+          console.error('Error loading parking data:', error)
+        } finally {
+          setLoading(false)
+        }
       }
     }
 
@@ -42,9 +47,14 @@ export default function ParkingDashboard() {
 
   const handleRefresh = async () => {
     setLoading(true)
-    const data = await getParkingData(selectedDate)
-    setParkingData(data)
-    setLoading(false)
+    try {
+      const data = await getParkingData(selectedDate)
+      setParkingData(data)
+    } catch (error) {
+      console.error('Error refreshing parking data:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (loading) {
@@ -62,7 +72,7 @@ export default function ParkingDashboard() {
           <div
             key={garage.id}
             className={`transition-all duration-500 ease-in-out ${
-              expandedGarageId && expandedGarageId !== garage.id ? "hidden pointer-events-none" : ""
+              expandedGarageId && expandedGarageId !== garage.id ? "opacity-0 invisible" : ""
             } ${expandedGarageId === garage.id ? "md:col-span-2 row-span-2 absolute top-0 left-0 right-0" : ""}`}
           >
             <ParkingGarageCard
@@ -72,6 +82,7 @@ export default function ParkingDashboard() {
               onRefresh={handleRefresh}
               selectedDate={selectedDate}
               onDateChange={setSelectedDate}
+              availableDates={availableDates}
             />
           </div>
         ))}

@@ -88,7 +88,22 @@ export default function DetailedGarageChart({ data, selectedDate }: DetailedGara
             <Bar dataKey="occupancy" radius={[4, 4, 0, 0]}>
               {formattedData.map((entry, index) => {
                 const isForecast = entry.forecast || (viewMode === "today" && entry.time > currentHourStr)
-                return <Cell key={`cell-${index}`} fill={isForecast ? "url(#pattern-forecast)" : "#3b82f6"} />
+                const isHighOccupancy = entry.occupancy >= 90
+                const isMediumOccupancy = entry.occupancy >= 80 && entry.occupancy < 90
+                
+                let fillColor = viewMode === "today" ? "#3b82f6" : "#4b5563" // blue or gray
+                if (isHighOccupancy) {
+                  fillColor = viewMode === "today" ? "#ef4444" : "#7f1d1d" // red or dark red
+                } else if (isMediumOccupancy) {
+                  fillColor = viewMode === "today" ? "#f97316" : "#7c2d12" // orange or dark orange
+                }
+
+                return (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={isForecast ? "url(#pattern-forecast)" : fillColor} 
+                  />
+                )
               })}
             </Bar>
             {viewMode === "today" && (
@@ -99,12 +114,6 @@ export default function DetailedGarageChart({ data, selectedDate }: DetailedGara
                 label={<Label value="Current" position="top" fill="#ffffff" />}
               />
             )}
-            <ReferenceLine
-              x={formatTime(maxOccupancy.time)}
-              stroke="#ef4444"
-              strokeDasharray="3 3"
-              label={<Label value={`${formatTime(maxOccupancy.time)}\n${maxOccupancy.occupancy}%`} position="top" fill="#ef4444" />}
-            />
           </BarChart>
         </ResponsiveContainer>
       </div>

@@ -5,7 +5,7 @@ import type { GarageData } from "@/lib/types"
 import TrendChart from "./trend-chart"
 import DetailedGarageChart from "./detailed-garage-chart"
 import { formatDate } from "@/lib/utils"
-import { getAvailableDates } from "@/lib/data"
+import { getAvailableDates, getGarageById } from "@/lib/data"
 
 interface ParkingGarageCardProps {
   garage: GarageData
@@ -14,6 +14,7 @@ interface ParkingGarageCardProps {
   onRefresh: () => void
   selectedDate: string
   onDateChange: (date: string) => void
+  availableDates: string[]
 }
 
 export default function ParkingGarageCard({ 
@@ -22,18 +23,20 @@ export default function ParkingGarageCard({
   onGarageClick, 
   onRefresh,
   selectedDate,
-  onDateChange
+  onDateChange,
+  availableDates
 }: ParkingGarageCardProps) {
   const { id, name, currentOccupancy, trend, trendDirection, nextHour } = garage
-  const [availableDates, setAvailableDates] = useState<string[]>([])
+  const [garageData, setGarageData] = useState(garage)
+  const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
-    async function loadDates() {
-      const dates = await getAvailableDates()
-      setAvailableDates(dates)
-    }
-    loadDates()
-  }, [])
+    setGarageData(garage)
+  }, [garage])
+
+  const handleDateChange = async (date: string) => {
+    onDateChange(date)
+  }
 
   return (
     <div
@@ -49,10 +52,10 @@ export default function ParkingGarageCard({
           <h2 className="text-2xl md:text-3xl">{name}</h2>
           {isExpanded && (
             <div className="flex items-center gap-2 ml-auto">
-              <p className="text-4xl md:text-5xl leading-none">{currentOccupancy}%</p>
-              <p className={`text-xl md:text-2xl ${trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
-                {trendDirection === "down" ? "-" : "+"}
-                {Math.abs(trend)}% next hour
+              <p className="text-4xl md:text-5xl leading-none">{garageData.currentOccupancy}%</p>
+              <p className={`text-xl md:text-2xl ${garageData.trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
+                {garageData.trendDirection === "down" ? "-" : "+"}
+                {Math.abs(garageData.trend)}% next hour
               </p>
             </div>
           )}
@@ -62,17 +65,17 @@ export default function ParkingGarageCard({
           <div className="flex justify-between items-end mt-4">
             <div className="flex items-center gap-1">
               <div>
-                <p className="text-7xl md:text-8xl mb-2 leading-none">{currentOccupancy}%</p>
-                <p className={`text-2xl md:text-3xl ${trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
-                  {trendDirection === "down" ? "-" : "+"}
-                  {Math.abs(trend)}% next hour
+                <p className="text-7xl md:text-8xl mb-2 leading-none">{garageData.currentOccupancy}%</p>
+                <p className={`text-2xl md:text-3xl ${garageData.trendDirection === "down" ? "text-green-500" : "text-red-500"}`}>
+                  {garageData.trendDirection === "down" ? "-" : "+"}
+                  {Math.abs(garageData.trend)}% next hour
                 </p>
               </div>
               <div className="w-60 h-32 relative ml-4 mb-10">
                 <TrendChart 
-                  rawData={garage.hourlyData.flatMap(hour => hour.rawData || [])}
-                  predictions={garage.hourlyData.map(hour => hour.occupancy)}
-                  direction={trendDirection} 
+                  rawData={garageData.hourlyData.flatMap(hour => hour.rawData || [])}
+                  predictions={garageData.hourlyData.map(hour => hour.occupancy)}
+                  direction={garageData.trendDirection} 
                 />
               </div>
             </div>
@@ -93,7 +96,8 @@ export default function ParkingGarageCard({
                 <select
                   className="bg-[#1a1d24] text-gray-400 border border-[#333842] rounded px-2 py-1"
                   value={selectedDate}
-                  onChange={(e) => onDateChange(e.target.value)}
+                  onChange={(e) => handleDateChange(e.target.value)}
+                  disabled={isLoading}
                 >
                   {availableDates.map((date) => (
                     <option key={date} value={date}>
@@ -108,6 +112,7 @@ export default function ParkingGarageCard({
                   e.stopPropagation()
                   onRefresh()
                 }}
+                disabled={isLoading}
               >
                 <RefreshCw size={18} />
                 <span>Refresh</span>
@@ -115,7 +120,13 @@ export default function ParkingGarageCard({
             </div>
           </div>
 
-          <DetailedGarageChart data={garage.hourlyData} selectedDate={selectedDate} />
+          {isLoading ? (
+            <div className="flex justify-center items-center h-[400px]">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : (
+            <DetailedGarageChart data={garageData.hourlyData} selectedDate={selectedDate} />
+          )}
         </div>
       </div>
     </div>
