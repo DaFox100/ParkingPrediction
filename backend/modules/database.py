@@ -8,6 +8,8 @@ import asyncio
 from pydantic import BaseModel
 from bson import ObjectId
 import pandas as pd
+import requests
+import time
 
 load_dotenv()
 
@@ -59,6 +61,11 @@ north_avg_fullness = [[] for _ in range(7)]  # 7 days, each containing 24 hours
 south_avg_fullness = [[] for _ in range(7)]
 west_avg_fullness = [[] for _ in range(7)]
 south_campus_avg_fullness = [[] for _ in range(7)]
+
+# Weather cache variables
+weather_cache = None
+weather_cache_timestamp = None
+CACHE_EXPIRATION = 3600  # 1 hour in seconds
 
 async def init_db():
     """Initialize the database and create time series collection if it doesn't exist"""
@@ -578,3 +585,55 @@ async def get_garage_averages(garage: str) -> List[List[int]]:
         return south_campus_avg_fullness
     else:
         raise ValueError(f"Invalid garage name: {garage}")
+
+async def get_current_weather() -> dict:
+    """
+    Fetch current weather data from the National Weather Service API.
+    Uses caching to avoid too many API calls.
+    
+    Returns:
+        dict: Dictionary containing temperature and weather condition
+    """
+    global weather_cache, weather_cache_timestamp
+    
+    # Check if cache is valid
+    current_time = time.time()
+    if (weather_cache is not None and 
+        weather_cache_timestamp is not None and 
+        current_time - weather_cache_timestamp < CACHE_EXPIRATION):
+        print("Returning cached weather data")
+        return weather_cache
+    
+    latitude = 37.34
+    longitude = -121.87
+    
+    try:
+        print("Fetching fresh weather data")
+        # Fetch the metadata URL for the given latitude and longitude
+        metadata_url = f"https://api.weather.gov/points/{latitude},{longitude}"
+        response = requests.get(metadata_url)
+        response.raise_for_status()
+        forecast_url = response.json()['properties']['forecastHourly']
+        
+        # Get the hourly forecast
+        forecast = requests.get(forecast_url).json()
+        current_period = forecast['properties']['periods'][0]
+        
+        # Update cache
+        weather_cache = {
+            "temperature": current_period['temperature'],
+            "condition": current_period['shortForecast']
+        }
+        weather_cache_timestamp = current_time
+        
+        return weather_cache
+    except Exception as e:
+        print(f"Error fetching weather data: {e}")
+        # If we have cached data, return it even if it's expired
+        if weather_cache is not None:
+            print("Returning expired cached data due to API error")
+            return weather_cache
+        return {
+            "temperature": None,
+            "condition": None
+        }

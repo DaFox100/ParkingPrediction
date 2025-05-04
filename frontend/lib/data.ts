@@ -175,3 +175,16 @@ export async function getAverageFullness(garageId: string, selectedDate: string)
     return Array(24).fill(0) // Return zeros as fallback
   }
 }
+
+export async function getWeather(): Promise<{ temperature: number; condition: string }> {
+  try {
+    const response = await fetch('http://127.0.0.1:8000/api/weather')
+    if (!response.ok) {
+      throw new Error('Failed to fetch weather data')
+    }
+    return await response.json()
+  } catch (error) {
+    console.error('Error fetching weather data:', error)
+    return { temperature: 0, condition: 'unknown' }
+  }
+}

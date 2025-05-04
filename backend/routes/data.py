@@ -11,7 +11,7 @@ import sys
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
 
-from modules.database import get_garage_data, get_available_dates, get_data_per_hour, get_latest_timestamp
+from modules.database import get_garage_data, get_available_dates, get_data_per_hour, get_latest_timestamp, get_current_weather
 from data.forecasting.predict_future_times_individual_garage import calculate_prediction
 
 
@@ -144,5 +144,16 @@ async def get_average_fullness(garage: str, day: int) -> List[int]:
         return garage_averages[day]
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/weather")
+async def get_weather():
+    """
+    Get current weather data including temperature and condition.
+    
+    Returns:
+        dict: Dictionary containing temperature in Fahrenheit and weather condition
+    """
+    weather_data = await get_current_weather()
+    return weather_data
 
 
