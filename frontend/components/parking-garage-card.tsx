@@ -145,6 +145,7 @@ export default function ParkingGarageCard({
               isTodayMode={isTodayMode}
               onModeChange={onModeChange}
               averageFullness={averageFullness}
+              garageName={name}
             />
           )}
         </div>

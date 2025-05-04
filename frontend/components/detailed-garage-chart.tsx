@@ -23,9 +23,10 @@ interface DetailedGarageChartProps {
   isTodayMode: boolean
   onModeChange: (mode: 'today' | 'historical') => void
   averageFullness: number[]
+  garageName: string
 }
 
-export default function DetailedGarageChart({ data, selectedDate, isTodayMode, onModeChange, averageFullness }: DetailedGarageChartProps) {
+export default function DetailedGarageChart({ data, selectedDate, isTodayMode, onModeChange, averageFullness, garageName }: DetailedGarageChartProps) {
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const isToday = selectedDate === todayStr
@@ -120,7 +121,13 @@ export default function DetailedGarageChart({ data, selectedDate, isTodayMode, o
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-2">
+          <h2 className="text-2xl"></h2>
+          {garageName === "North" && (
+            <span className="text-yellow-400 text-md">Floor 2 is Employees Only</span>
+          )}
+        </div>
         <div className="flex rounded-md overflow-hidden">
           <button
             className={`px-4 py-2 ${isTodayMode ? "bg-blue-600" : "bg-[#333842] hover:bg-[#3b82f6]"} transition-colors`}
