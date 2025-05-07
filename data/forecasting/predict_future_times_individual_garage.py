@@ -258,6 +258,7 @@ def calculate_prediction(forecast_start: datetime) -> List[float]:
     global extra_long_data
 
     data: pd.DataFrame = load_data_from_mongodb(forecast_start)
+    print(data)
     # data: pd.DataFrame = load_data()
     short_data: pd.DataFrame = data.drop(columns=["date"]).copy() # Keep a copy of the raw density data (without date)
     long_garage_models: List[Model] = []

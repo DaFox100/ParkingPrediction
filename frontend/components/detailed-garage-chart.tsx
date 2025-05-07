@@ -145,15 +145,16 @@ export default function DetailedGarageChart({ data, selectedDate, isTodayMode, o
             Today
           </button>
           <button
-            className={`px-4 py-2 ${!isTodayMode ? "bg-blue-600" : "bg-[#333842] hover:bg-[#3b82f6]"} transition-colors`}
+            className={`px-4 py-2 ${!isTodayMode ? "bg-blue-600" : "bg-[#333842]"} cursor-not-allowed opacity-50`}
             onClick={() => onModeChange('historical')}
+            disabled
           >
             Historical
           </button>
         </div>
       </div>
 
-      <div className="h-[400px]">
+      <div className="h-[400px]">y
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={formattedData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
             <defs>
