@@ -1,5 +1,6 @@
 import os
 import sys
+import joblib
 from pathlib import Path
 
 # Add the project root to Python path
@@ -12,23 +13,25 @@ from sklearn.preprocessing import MinMaxScaler
 from typing import List, Tuple, Any, Dict, Optional, Union
 from keras import Model
 from datetime import datetime
-from pymongo import MongoClient
-from dotenv import load_dotenv
+
 
 # Try to import using the full path first, fall back to local imports if that fails
 try:
     from data.forecasting.keras_model_file import build_model
     from data.forecasting.short_term_model import train_short_model
     from data.forecasting.long_term_model import train_long_model
+    from data.forecasting.data_functions import add_cyclical_time_encoding, add_event_impact_features,add_instruction_days, load_data_from_mongodb
     from data.forecasting import utils
     from data.forecasting.constants import (
         MODEL_DIRECTORY,
-        LOGS_DIRECTORY,
         GARAGE_NAMES,
         LONG_SEQ,
         LONG_FUTURE_STEPS,
         SHORT_SEQ,
-        SHORT_FUTURE_STEPS
+        SHORT_FUTURE_STEPS,
+        ENABLE_TIME_ENCODING,
+        ENABLE_INSTR_DAY,
+        ENABLE_EVENT_ENCODING
     )
 except ImportError:
     # Fall back to local imports if the full path imports fail
@@ -43,233 +46,216 @@ except ImportError:
         LONG_SEQ,
         LONG_FUTURE_STEPS,
         SHORT_SEQ,
-        SHORT_FUTURE_STEPS
+        SHORT_FUTURE_STEPS,
+        ENABLE_TIME_ENCODING,
+        ENABLE_INSTR_DAY,
+        ENABLE_EVENT_ENCODING
     )
-
-load_dotenv()
-MONGO_URI = os.getenv("MONGO_URI")
-
 # control flags  [True,True,True,True] [False,False,False,False] (for easy copy paste)
 LONG_TRAINING_MASK: List[bool]      = [False,False,False,False]
 SHORT_TRAINING_MASK: List[bool]     = [False,False,False,False]
-ENABLE_TIME_ENCODING: bool          = True
-ENABLE_INSTR_DAY: bool              = True
-ENABLE_INSTR_NEXT_DAY: bool         = True
 
-# counting the extra features added to the long model
-extra_long_data: int = 0
+LONG_HYPER_PARAMS: Dict[str, Dict[str, Any]] = {
+    "south": {
+        "lstm_neurons_list": [192, 32, 192],
+        "dropout": 0.1,
+        "learning_rate": 2e-5,
+        "activation": "linear",},
+    "west": {
+        "lstm_neurons_list": [192, 32, 192],
+        "dropout": 0.1,
+        "learning_rate": 2e-5,
+        "activation": "linear",},
+    "north": {
+        "lstm_neurons_list": [192, 32, 192],
+        "dropout": 0.1,
+        "learning_rate": 2e-5,
+        "activation": "linear",},
+    "south_campus": {
+        "lstm_neurons_list": [512, 64, 512],
+        "dropout": 0.1,
+        "learning_rate": 1e-5,
+        "activation": "linear",}
+}
 
-# Load and preprocess log.csv data
-def load_data() -> pd.DataFrame:
-    data: pd.DataFrame = pd.read_csv(LOGS_DIRECTORY / "log.csv")
-    data = data[-1000:] # WHY IS THIS NESSESSARY TO WORK, I DON'T KNOW
-    data = data.drop(columns=["Unnamed: 0", "south density", "west density", "north density", "south compus density"])
-    print("\n", data.head(), "\n")
-    return data
-
-def load_data_from_mongodb(forecast_start: datetime, limit: int = 1000) -> pd.DataFrame:
-    client = MongoClient(MONGO_URI)
-    db = client["sjparking"]
-    collection = db["datapoints"]
-
-    # Get the 1000 most recent datapoints before forecast_start, sorted descending
-    cursor = collection.find(
-        {"timestamp": {"$lt": forecast_start}, "metadata": "sjparking"}
-    ).sort("timestamp", -1).limit(limit)
-    docs = list(cursor)
-    if not docs:
-        raise ValueError("No data loaded from MongoDB for the requested range!")
-    # Reverse to chronological order (oldest to newest)
-    docs = docs[::-1]
-    df = pd.DataFrame(docs)
-    # Rename columns to match CSV
-    df.rename(columns={
-        "timestamp": "date",
-        "south_status": "south",
-        "west_status": "west",
-        "north_status": "north",
-        "south_campus_status": "south campus"  # <-- match CSV
-    }, inplace=True)
-    df = df.drop(columns=["_id", "metadata"])
-    # Scale integer columns to 0.00–1.00
-    for col in ["south", "west", "north", "south campus"]:
-        df[col] = df[col] / 100.0
-    # Reorder columns to match CSV
-    df = df[["date", "south", "west", "north", "south campus"]]
-    print("\nMongoDB data range:", df['date'].min(), "to", df['date'].max(), "\n")
-    print("\n", df.head(), "\n")
-    return df
-
-# Load the instruction days CSV and prepare it
-def load_instruction_days(data: pd.DataFrame) -> pd.DataFrame:
-    global extra_long_data
-    instruction_days_df: pd.DataFrame = pd.read_csv(f"{LOGS_DIRECTORY}/sjsu_instruction_days.csv")
-    instruction_days_df["Date"] = pd.to_datetime(instruction_days_df["Date"]).dt.date
-    instruction_days_df.rename(columns={"Instruction_Day": "instruction_day"}, inplace=True)
-    # Prepare the log data
-    data['date'] = pd.to_datetime(data['date'])
-    data['date_only'] = data['date'].dt.date
-    # Merge original instruction day flag
-    data = pd.merge(data, instruction_days_df, how="left", left_on="date_only", right_on="Date")
-    data["instruction_day"] = data["instruction_day"].fillna(False)
-    
-    if ENABLE_INSTR_NEXT_DAY: 
-        # Add a column for the previous day that maps to the next day's instruction flag
-        next_day_instr_df: pd.DataFrame = instruction_days_df.copy()
-        next_day_instr_df["Date"] = next_day_instr_df["Date"] - pd.Timedelta(days=1)
-        next_day_instr_df.rename(columns={"instruction_day": "next_day_instruction"}, inplace=True)
-         # Merge next-day instruction flag
-        data = pd.merge(data, next_day_instr_df, how="left", left_on="date_only", right_on="Date")
-        data["next_day_instruction"] = data["next_day_instruction"].fillna(False)
-        data.drop(columns=["Date_x", "Date_y", "date_only"], inplace=True)
-        extra_long_data += 1
-    else: # Drop temporary columns
-        data.drop(columns=["Date", "date_only"], inplace=True)
-        
-    extra_long_data += 1
-        
-    return data
-
-#cyclical time encodings
-# Prepare data for long-term model (includes time encoding features)
-def cyclical_time_encoding(data: pd.DataFrame) -> pd.DataFrame:
-    ts: pd.Series = data['date']
-    data['month_sin']       = np.sin(2 * np.pi * ((ts.dt.month - 1) / 12))
-    data['month_cos']       = np.cos(2 * np.pi * ((ts.dt.month - 1) / 12))
-    data['day_sin']         = np.sin(2 * np.pi * (ts.dt.day / 31))
-    data['day_cos']         = np.cos(2 * np.pi * (ts.dt.day / 31))
-    data['day_of_week_sin'] = np.sin(2 * np.pi * (ts.dt.dayofweek / 7))
-    data['day_of_week_cos'] = np.cos(2 * np.pi * (ts.dt.dayofweek / 7))
-    data['hour_sin']        = np.sin(2 * np.pi * (ts.dt.hour / 24))
-    data['hour_cos']        = np.cos(2 * np.pi * (ts.dt.hour / 24))
-    data['minute_sin']      = np.sin(2 * np.pi * (ts.dt.minute / 60))
-    data['minute_cos']      = np.cos(2 * np.pi * (ts.dt.minute / 60))
-    global extra_long_data
-    extra_long_data += 10
-    
-    return data.copy()
+SHORT_HYPER_PARAMS: Dict[str, Dict[str, Any]] = {
+    "south": {
+        "lstm_neurons_list": [64, 16, 64],
+        "dropout": 0.10,
+        "learning_rate": 1e-4,
+        "activation": "celu",},
+    "west": {
+        "lstm_neurons_list": [64, 16, 64],
+        "dropout": 0.10,
+        "learning_rate": 1e-4,
+        "activation": "celu",},
+    "north": {
+        "lstm_neurons_list": [64, 16, 64],
+        "dropout": 0.10,
+        "learning_rate": 1e-4,
+        "activation": "celu",},
+    "south_campus": {
+        "lstm_neurons_list": [64, 16, 64],
+        "dropout": 0.10,
+        "learning_rate": 1e-4,
+        "activation": "celu",}
+}
 
 # long model hyperparameters
-def _build_long_model(garage_no: int, shape: int) -> Model:
+def _build_long_model(garage: str, feature_dim: int) -> Model:
+    # look up this garage’s hyperparams, fall back to first dict entry if missing
+    params = LONG_HYPER_PARAMS.get(
+        garage,
+        next(iter(LONG_HYPER_PARAMS.values()))
+    )
     return build_model(
-    lstm_neurons_list=[192,32,192],
-    dropout=0.1,
-    learning_rate=2e-5,
-    seq_size=LONG_SEQ,
-    activation='linear',
-    n_feature=shape,
-    future_steps=LONG_FUTURE_STEPS,
-    garage_no=garage_no)
+        lstm_neurons_list = params["lstm_neurons_list"],
+        dropout           = params["dropout"],
+        learning_rate     = params["learning_rate"],
+        seq_size          = LONG_SEQ,
+        activation        = params.get("activation", "linear"),
+        n_feature         = feature_dim,
+        future_steps      = LONG_FUTURE_STEPS,
+        garage_no         = garage
+    )
     
 # short model hyperparameters 
-def _build_short_model(garage_no: int, shape: int) -> Model:
+def _build_short_model(garage: str, feature_dim: int) -> Model:
+    params = SHORT_HYPER_PARAMS.get(
+        garage,
+        next(iter(SHORT_HYPER_PARAMS.values()))
+    )
     return build_model(
-    lstm_neurons_list=[64,16,64],
-    dropout=0.1,
-    learning_rate=1e-4,
-    seq_size=SHORT_SEQ,
-    activation='celu',
-    n_feature=shape,
-    future_steps=SHORT_FUTURE_STEPS,
-    garage_no=garage_no)
+        lstm_neurons_list = params["lstm_neurons_list"],
+        dropout           = params["dropout"],
+        learning_rate     = params["learning_rate"],
+        seq_size          = SHORT_SEQ,
+        activation        = params.get("activation", "celu"),
+        n_feature         = feature_dim,
+        future_steps      = SHORT_FUTURE_STEPS,
+        garage_no         = garage
+    )
     
-def _train_long(garage: str, long_garage_model: Model) -> None:
+def _train_long(garage: str, model: Model) -> None:
     print(f"training long model: {garage}")
     train_long_model(
-    model=long_garage_model,
-    training_epochs=35,
-    batch_size=512,
-    future_steps=LONG_FUTURE_STEPS,
-    test_split=0.8,
-    seq_size=LONG_SEQ,
-    name=f"long_model_{garage}")
+        model=model,
+        training_epochs=10,
+        batch_size=32,
+        future_steps=LONG_FUTURE_STEPS,
+        test_split=0.80,
+        seq_size=LONG_SEQ,
+        name=f"long_model_{garage}"
+    )
 
-def _train_short(garage: str, short_garage_model: Model) -> None:
+
+def _train_short(garage: str, model: Model) -> None:
     print(f"training short model: {garage}")
     train_short_model(
-    model=short_garage_model,
-    training_epochs=25,
-    batch_size=32,
-    future_steps=SHORT_FUTURE_STEPS,
-    test_split=0.8,
-    seq_size=SHORT_SEQ,
-    name=f"short_model_{garage}")
+        model=model,
+        training_epochs=25,
+        batch_size=32,
+        future_steps=SHORT_FUTURE_STEPS,
+        test_split=0.8,
+        seq_size=SHORT_SEQ,
+        name=f"short_model_{garage}"
+    )
  
-# returns a [long_prediction,no_garages] sized 2d array, currently it only predicts from the most recent CSV data
-def _make_prediction( data: pd.DataFrame, short_data: pd.DataFrame, 
-                    long_garage_models: List[Model], short_garage_models: List[Model], 
-                    short_feature_shape: int, long_feature_shape: int
-                    ) -> np.ndarray:
-    
-    # Scale the data for long model
-    scaler_long: MinMaxScaler = MinMaxScaler()
-    scaler_long.fit(data)
-    scaled_long: pd.DataFrame = pd.DataFrame(scaler_long.transform(data), columns=data.columns)
+def load_or_fit_scaler(scaler_path, data: pd.DataFrame) -> MinMaxScaler:
+    """
+    Loads a persisted MinMaxScaler from scaler_path if available,
+    otherwise fits a new scaler on the provided data and persists it.
+    """
+    if scaler_path.exists():
+        scaler = joblib.load(scaler_path)
+    else:
+        scaler = MinMaxScaler().fit(data)
+        joblib.dump(scaler, scaler_path)
+    return scaler
 
-    # Scale the data for short model
-    scaler_short: MinMaxScaler = MinMaxScaler()
-    scaler_short.fit(short_data)
-    scaled_short: pd.DataFrame = pd.DataFrame(scaler_short.transform(short_data), columns=short_data.columns)
-    
-    # Load weights if available
-    try: 
-        for index, garage in enumerate(GARAGE_NAMES, start=0):
-            # Using Path object for better readability and cross-platform compatibility
-            long_garage_models[index].load_weights(MODEL_DIRECTORY / f"long_model_{garage}.weights.h5")
-            short_garage_models[index].load_weights(MODEL_DIRECTORY / f"short_model_{garage}.weights.h5")
-    except Exception as e:
+
+def _make_prediction(
+    data: pd.DataFrame, short_data: pd.DataFrame,
+    long_models: List[Model], short_models: List[Model],
+    short_dim: int, long_dim: int
+) -> np.ndarray:
+
+    # Use persisted scalers instead of fitting new ones every time;
+    # these files should have been created during model training.
+    scaler_long_path = MODEL_DIRECTORY / "scaler_long.pkl"
+    scaler_short_path = MODEL_DIRECTORY / "scaler_short.pkl"
+    scaler_long = load_or_fit_scaler(scaler_long_path, data)
+    scaler_short = load_or_fit_scaler(scaler_short_path, short_data)
+
+    scaled_long = pd.DataFrame(
+        scaler_long.transform(data),
+        columns=data.columns
+    )
+    scaled_short = pd.DataFrame(
+        scaler_short.transform(short_data),
+        columns=short_data.columns
+    )
+
+    try:
+        for i, garage in enumerate(GARAGE_NAMES):
+            long_models[i].load_weights(
+                MODEL_DIRECTORY / f"long_model_{garage}.weights.h5"
+            )
+            short_models[i].load_weights(
+                MODEL_DIRECTORY / f"short_model_{garage}.weights.h5"
+            )
+    except Exception:
         print("Could not load weights, please verify you have existing weight files, exiting.")
         exit(-1)
 
-    # Prepare prediction batches
-    short_sample_batch: np.ndarray = scaled_short.values[-SHORT_SEQ:].reshape(1, SHORT_SEQ, short_feature_shape)
-    long_sample_batch: np.ndarray = scaled_long.values[-LONG_SEQ:].reshape(1, LONG_SEQ, long_feature_shape)
+    # prepare batches
+    short_batch = scaled_short.values[-SHORT_SEQ:].reshape(1, SHORT_SEQ, short_dim)
+    long_batch  = scaled_long.values[-LONG_SEQ:].reshape(1, LONG_SEQ, long_dim)
 
-    long_preds: List[np.ndarray] = []
-    short_preds: List[np.ndarray] = []
+    long_preds = []
+    short_preds = []
+    for i, garage in enumerate(GARAGE_NAMES):
+        lp = long_models[i].predict(long_batch, verbose=0)[0]
+        sp = short_models[i].predict(short_batch, verbose=0)[0]
+        long_preds.append(np.clip(scaler_long.inverse_transform(lp)[:, i], 0, 1))
+        short_preds.append(np.clip(scaler_short.inverse_transform(sp)[:, i], 0, 1))
 
-    # Predict using the models, and unscale them
-    for index, garage in enumerate(GARAGE_NAMES, start=0):
-        long_pred: np.ndarray = long_garage_models[index].predict(long_sample_batch, verbose=2)[0]
-        short_pred: np.ndarray = short_garage_models[index].predict(short_sample_batch, verbose=2)[0]
-        long_unscaled_pred: np.ndarray = np.clip(scaler_long.inverse_transform(long_pred)[:, index], 0, 1)
-        short_unscaled_pred: np.ndarray = np.clip(scaler_short.inverse_transform(short_pred)[:, index], 0, 1)
-        long_preds.append(long_unscaled_pred)
-        short_preds.append(short_unscaled_pred)
+    # combine predictions from both models
+    fut_len = len(long_preds[0])
+    sh_len = len(short_preds[0])
+    t = np.arange(sh_len)
+    w_short = 0.5 * (1 + np.cos(np.pi * t / (sh_len - 1)))
+    w_long = 1.0 - w_short
 
-
-    # Combine short & long predictions with raised-cosine fade 
-    future_length: int = len(long_preds[0])
-    short_length: int = len(short_preds[0])
-    t: np.ndarray = np.arange(short_length)
-    w_short: np.ndarray = 0.5 * (1 + np.cos(np.pi * t / (short_length - 1)))
-    w_long: np.ndarray = 1.0 - w_short
-    combined: np.ndarray = np.zeros((future_length, 4))
-
-    # for each of the first 4 features
-    for i in range(4):
-        combined[:short_length, i] = (w_short * short_preds[i] + w_long  * long_preds[i][:short_length])
-        combined[short_length:, i] = long_preds[i][short_length:]
-
+    combined = np.zeros((fut_len, len(GARAGE_NAMES)))
+    for i in range(len(GARAGE_NAMES)):
+        combined[:sh_len, i] = w_short * short_preds[i] + w_long * long_preds[i][:sh_len]
+        combined[sh_len:, i] = long_preds[i][sh_len:]
     return combined
 
 
 def calculate_prediction(forecast_start: datetime) -> List[float]:
-    global extra_long_data
+    extra_long_data = 0
 
     data: pd.DataFrame = load_data_from_mongodb(forecast_start)
-    print(data)
-    # data: pd.DataFrame = load_data()
     short_data: pd.DataFrame = data.drop(columns=["date"]).copy() # Keep a copy of the raw density data (without date)
-    long_garage_models: List[Model] = []
-    short_garage_models: List[Model] = []
     
     # Process the data
     if ENABLE_INSTR_DAY:
-        data = load_instruction_days(data)
+        data = add_instruction_days(data)
+        extra_long_data += 2
     if ENABLE_TIME_ENCODING:
-        data = cyclical_time_encoding(data)
+        data = add_cyclical_time_encoding(data)
+        extra_long_data += 10
+    if ENABLE_EVENT_ENCODING:
+        data = add_event_impact_features(data)
+        extra_long_data += 4
         
+
+    # data: pd.DataFrame = load_data()
+    long_garage_models: List[Model] = []
+    short_garage_models: List[Model] = []
+    
     long_data: pd.DataFrame = data.drop(columns=['date']).copy()
         
     # Define parameters for long and short models

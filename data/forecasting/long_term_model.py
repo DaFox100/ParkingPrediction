@@ -1,61 +1,27 @@
 import numpy as np
 import pandas as pd
+import datetime as dt
 from data.forecasting.keras_model_file import train_model
 from sklearn.preprocessing import MinMaxScaler
+from data.forecasting.data_functions import add_cyclical_time_encoding, add_event_impact_features,add_instruction_days, load_data_from_mongodb
 
 from data.forecasting.constants import (
-    LOGS_DIRECTORY
+    ENABLE_TIME_ENCODING,
+    ENABLE_INSTR_DAY,
+    ENABLE_EVENT_ENCODING
 )
-
-enable_instr_day = True
-enable_instr_next_day = True
 
 def train_long_model(model, batch_size, future_steps, test_split, seq_size, name, training_epochs):
     
-    # Load and preprocess log.csv data
-    data = pd.read_csv(f"{LOGS_DIRECTORY}/log.csv")
-    data = data.drop(columns=["Unnamed: 0", "south density", "west density", "north density", "south compus density"])
-
-    # Load the instruction days CSV and prepare it
-    if enable_instr_day:
-        instruction_days_df = pd.read_csv(f"{LOGS_DIRECTORY}/sjsu_instruction_days.csv")
-        instruction_days_df["Date"] = pd.to_datetime(instruction_days_df["Date"]).dt.date
-        instruction_days_df.rename(columns={"Instruction_Day": "instruction_day"}, inplace=True)
-        # Prepare the log data
-        data['date'] = pd.to_datetime(data['date'])
-        data['date_only'] = data['date'].dt.date
-
-        # Merge original instruction day flag
-        data = pd.merge(data, instruction_days_df, how="left", left_on="date_only", right_on="Date")
-        data["instruction_day"] = data["instruction_day"].fillna(False)
-
-        if enable_instr_next_day: 
-            # Add a column for the previous day that maps to the next day's instruction flag
-            next_day_instr_df = instruction_days_df.copy()
-            next_day_instr_df["Date"] = next_day_instr_df["Date"] - pd.Timedelta(days=1)
-            next_day_instr_df.rename(columns={"instruction_day": "next_day_instruction"}, inplace=True)
-            # Merge next-day instruction flag
-            data = pd.merge(data, next_day_instr_df, how="left", left_on="date_only", right_on="Date")
-            data["next_day_instruction"] = data["next_day_instruction"].fillna(False)
-            data.drop(columns=["Date_x", "Date_y", "date_only"], inplace=True)
-        else: # Drop temporary columns
-            data.drop(columns=["Date", "date_only"], inplace=True)
-
-
-
-    # === Feature engineering: cyclical encodings ===
-    ts = data['date']
-    data['month_sin']       = np.sin(2 * np.pi * ts.dt.month-1     / 12)
-    data['month_cos']       = np.cos(2 * np.pi * ts.dt.month-1     / 12)
-    data['day_sin']         = np.sin(2 * np.pi * ts.dt.day       / 31)
-    data['day_cos']         = np.cos(2 * np.pi * ts.dt.day       / 31)
-    data['day_of_week_sin'] = np.sin(2 * np.pi * ts.dt.dayofweek / 7)
-    data['day_of_week_cos'] = np.cos(2 * np.pi * ts.dt.dayofweek / 7)
-    data['hour_sin']        = np.sin(2 * np.pi * ts.dt.hour      / 24)
-    data['hour_cos']        = np.cos(2 * np.pi * ts.dt.hour      / 24)
-    data['minute_sin']      = np.sin(2 * np.pi * ts.dt.minute    / 60)
-    data['minute_cos']      = np.cos(2 * np.pi * ts.dt.minute    / 60)
-
+    data: pd.DataFrame = load_data_from_mongodb(dt.datetime.now(),25000)
+    
+    # Process the data
+    if ENABLE_INSTR_DAY:
+        data = add_instruction_days(data)
+    if ENABLE_TIME_ENCODING:
+        data = add_cyclical_time_encoding(data)
+    if ENABLE_EVENT_ENCODING:
+        data = add_event_impact_features(data)
     # Prepare data for long-term model (includes positional encoding features)
     data = data.drop(columns=["date"]).copy()
     
