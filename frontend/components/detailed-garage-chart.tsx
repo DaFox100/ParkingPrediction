@@ -59,7 +59,7 @@ export default function DetailedGarageChart({ data, selectedDate, isTodayMode, o
       const hour = i.toString().padStart(2, '0')
       const time = `${hour}:00`
       const displayTime = formatTime(time)
-      const avg = averageFullness[i]
+      const avg = averageFullness[i] || 0 // Add fallback for undefined
 
       if (avg >= 90) {
         if (!currentPeriod) {
@@ -218,28 +218,33 @@ export default function DetailedGarageChart({ data, selectedDate, isTodayMode, o
                 label={<Label value="Current" position="top" fill="#ffffff" />}
               />
             )}
-            {!isFuture && highOccupancyPeriods.length > 0 && highOccupancyPeriods.map((period, index) => [
-              <ReferenceLine
-                key={`start-${index}`}
-                x={period.start}
-                stroke="#f97316"
-                strokeWidth={2}
-                strokeDasharray="3 3"
-                label={<Label value="( ! )" position="top" fill="#f97316" />}
-                ifOverflow="extendDomain"
-                alwaysShow={true}
-              />,
-              <ReferenceLine
-                key={`end-${index}`}
-                x={period.end}
-                stroke="#f97316"
-                strokeWidth={2}
-                strokeDasharray="3 3"
-                label={<Label value="( ! )" position="top" fill="#f97316" />}
-                ifOverflow="extendDomain"
-                alwaysShow={true}
-              />
-            ])}
+            {!isFuture && highOccupancyPeriods.length > 0 && highOccupancyPeriods.map((period, index) => {
+              // Add safety check for period values
+              if (!period?.start || !period?.end) return null;
+              
+              return [
+                <ReferenceLine
+                  key={`start-${index}`}
+                  x={period.start}
+                  stroke="#f97316"
+                  strokeWidth={2}
+                  strokeDasharray="3 3"
+                  label={<Label value="( ! )" position="top" fill="#f97316" />}
+                  ifOverflow="extendDomain"
+                  alwaysShow={true}
+                />,
+                <ReferenceLine
+                  key={`end-${index}`}
+                  x={period.end}
+                  stroke="#f97316"
+                  strokeWidth={2}
+                  strokeDasharray="3 3"
+                  label={<Label value="( ! )" position="top" fill="#f97316" />}
+                  ifOverflow="extendDomain"
+                  alwaysShow={true}
+                />
+              ]
+            })}
           </BarChart>
         </ResponsiveContainer>
       </div>
