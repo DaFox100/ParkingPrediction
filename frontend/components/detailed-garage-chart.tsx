@@ -226,7 +226,7 @@ export default function DetailedGarageChart({ data, selectedDate, isTodayMode, o
               return [
                 <ReferenceLine
                   key={`start-${index}`}
-                  x={(period.start as string)}
+                  x={String(period.start)}
                   stroke="#f97316"
                   strokeWidth={2}
                   strokeDasharray="3 3"
@@ -236,7 +236,7 @@ export default function DetailedGarageChart({ data, selectedDate, isTodayMode, o
                 />,
                 <ReferenceLine
                   key={`end-${index}`}
-                  x={(period.end as string)}
+                  x={String(period.end)}
                   stroke="#f97316"
                   strokeWidth={2}
                   strokeDasharray="3 3"
