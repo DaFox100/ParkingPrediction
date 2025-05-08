@@ -1,16 +1,64 @@
 import type { GarageData, RawDataPoint, HourlyData } from "./types"
 
+const API_BASE_URL = 'http://127.0.0.1:8000/api';
+
 // Get parking data from the API
 export async function getParkingData(date?: string): Promise<GarageData[]> {
   const selectedDate = date || new Date().toISOString().split('T')[0]
   const garages = ['north', 'west', 'south', 'south_campus']
   const names = ['North', 'West', 'South', 'SouthCampus']
   
-  // Check if we're viewing today's data
+  // Check if we're viewing today's data or future data
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const isToday = selectedDate === todayStr
+  const isFuture = selectedDate > todayStr
   
+  // For future dates, we don't need to make any API calls
+  if (isFuture) {
+    const garageDataPromises = garages.map(async (id) => {
+      try {
+        const predictions = await getPredictionsTomorrow(id)
+        const hourlyData = predictions.map((value: number, index: number) => {
+          const hour = index.toString().padStart(2, '0')
+          const time = `${hour}:00`
+          return {
+            time,
+            occupancy: value,
+            predictedOccupancy: value,
+            forecast: true,
+            rawData: []
+          }
+        })
+        
+        return {
+          id,
+          name: names[garages.indexOf(id)],
+          currentOccupancy: predictions[0] || 0,
+          trend: 0,
+          trendDirection: "up" as const,
+          nextHour: "00:00",
+          trendData: [],
+          hourlyData
+        }
+      } catch (error) {
+        console.error(`Error fetching predictions for ${id}:`, error)
+        return {
+          id,
+          name: names[garages.indexOf(id)],
+          currentOccupancy: -1,
+          trend: 0,
+          trendDirection: "up" as const,
+          nextHour: "00:00",
+          trendData: [],
+          hourlyData: []
+        }
+      }
+    })
+    return Promise.all(garageDataPromises)
+  }
+
+  // For today or past dates, make the API call
   const garageDataPromises = garages.map(async (id) => {
     try {
       const response = await fetch(`http://127.0.0.1:8000/api/data?date=${selectedDate}&garage_id=${id}`)
@@ -73,11 +121,10 @@ export async function getParkingData(date?: string): Promise<GarageData[]> {
       }
     } catch (error) {
       console.error(`Error fetching data for ${id}:`, error)
-      // Return error state instead of mock data
       return {
         id,
         name: names[garages.indexOf(id)],
-        currentOccupancy: -1, // Use -1 to indicate error state
+        currentOccupancy: -1,
         trend: 0,
         trendDirection: "up" as const,
         nextHour: "00:00",
@@ -157,17 +204,16 @@ export async function getLatestUpdate(): Promise<string> {
   }
 }
 
-export async function getPredictions(garageId: string): Promise<number[]> {
-  try {
-    const response = await fetch(`http://127.0.0.1:8000/api/predictions/${garageId}`)
-    if (!response.ok) {
-      throw new Error(`Failed to fetch predictions for ${garageId}`)
-    }
-    return await response.json()
-  } catch (error) {
-    console.error(`Error fetching predictions for ${garageId}:`, error)
-    return Array(24).fill(0) // Return zeros as fallback
-  }
+export async function getPredictions(garage: string): Promise<number[]> {
+  const response = await fetch(`${API_BASE_URL}/predictions/${garage}`);
+  if (!response.ok) throw new Error('Failed to fetch predictions');
+  return response.json();
+}
+
+export async function getPredictionsTomorrow(garage: string): Promise<number[]> {
+  const response = await fetch(`${API_BASE_URL}/predictions-tomorrow/${garage}`);
+  if (!response.ok) throw new Error('Failed to fetch tomorrow\'s predictions');
+  return response.json();
 }
 
 export async function getAverageFullness(garageId: string, selectedDate: string): Promise<number[]> {

@@ -22,3 +22,17 @@ export interface HourlyData {
   forecast?: boolean
   rawData?: RawDataPoint[]
 }
+
+export interface ParkingGarageCardProps {
+  garage: GarageData
+  isExpanded: boolean
+  onGarageClick: (id: string) => void
+  onRefresh: () => void
+  selectedDate: string
+  onDateChange: (date: string) => void
+  availableDates: string[]
+  isTodayMode: boolean
+  onModeChange: (mode: 'today' | 'historical' | 'future') => void
+  averageFullness: number[]
+  tomorrowPredictions: number[]
+}

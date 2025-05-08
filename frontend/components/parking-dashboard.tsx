@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import ParkingGarageCard from "@/components/parking-garage-card"
-import { getParkingData, getAvailableDates, getAverageFullness } from "@/lib/data"
+import { getParkingData, getAvailableDates, getAverageFullness, getPredictionsTomorrow } from "@/lib/data"
 import type { GarageData } from "@/lib/types"
 
 export default function ParkingDashboard() {
@@ -13,6 +13,7 @@ export default function ParkingDashboard() {
   const [availableDates, setAvailableDates] = useState<string[]>([])
   const [isTodayMode, setIsTodayMode] = useState(true)
   const [averageFullness, setAverageFullness] = useState<Record<string, number[]>>({})
+  const [tomorrowPredictions, setTomorrowPredictions] = useState<Record<string, number[]>>({})
 
   useEffect(() => {
     async function loadDates() {
@@ -20,9 +21,11 @@ export default function ParkingDashboard() {
       // Sort dates in descending order (newest first)
       const sortedDates = dates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
       setAvailableDates(sortedDates)
-      if (sortedDates.length > 0) {
-        setSelectedDate(sortedDates[0]) // Set to most recent date by default
-      }
+      
+      // Set to today's date by default
+      const today = new Date()
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+      setSelectedDate(todayStr)
     }
     loadDates()
   }, [])
@@ -40,14 +43,35 @@ export default function ParkingDashboard() {
     setAverageFullness(avgFullnessMap)
   }
 
+  const fetchTomorrowPredictions = async (garages: GarageData[]) => {
+    const predictionsPromises = garages.map(async (garage) => {
+      const predictions = await getPredictionsTomorrow(garage.id)
+      return { id: garage.id, predictions }
+    })
+    const predictionsResults = await Promise.all(predictionsPromises)
+    const predictionsMap = predictionsResults.reduce((acc, { id, predictions }) => {
+      acc[id] = predictions
+      return acc
+    }, {} as Record<string, number[]>)
+    setTomorrowPredictions(predictionsMap)
+  }
+
   useEffect(() => {
     async function loadData() {
       if (selectedDate) {
         setLoading(true)
         try {
+          const today = new Date().toISOString().split('T')[0]
+          const isTomorrow = selectedDate > today
+          
+          // For tomorrow, we'll use predictions
           const data = await getParkingData(selectedDate)
           setParkingData(data)
-          await fetchAverages(data)
+          
+          // Only fetch averages for today or past dates
+          if (!isTomorrow) {
+            await fetchAverages(data)
+          }
         } catch (error) {
           console.error('Error loading parking data:', error)
         } finally {
@@ -57,7 +81,7 @@ export default function ParkingDashboard() {
     }
 
     loadData()
-  }, [selectedDate])
+  }, [selectedDate]) // Only depend on selectedDate
 
   const handleGarageClick = (id: string) => {
     setExpandedGarageId(expandedGarageId === id ? null : id)
@@ -66,9 +90,16 @@ export default function ParkingDashboard() {
   const handleRefresh = async () => {
     setLoading(true)
     try {
+      const today = new Date().toISOString().split('T')[0]
+      const isTomorrow = selectedDate > today
+      
       const data = await getParkingData(selectedDate)
       setParkingData(data)
-      await fetchAverages(data)
+      
+      // Only fetch averages for today or past dates
+      if (!isTomorrow) {
+        await fetchAverages(data)
+      }
     } catch (error) {
       console.error('Error refreshing parking data:', error)
     } finally {
@@ -76,12 +107,20 @@ export default function ParkingDashboard() {
     }
   }
 
-  const handleModeChange = (mode: 'today' | 'historical') => {
+  const handleModeChange = (mode: 'today' | 'historical' | 'future') => {
     if (availableDates.length < 2) return
 
     if (mode === 'today') {
       setIsTodayMode(true)
-      setSelectedDate(availableDates[0]) // Most recent date
+      const today = new Date()
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+      setSelectedDate(todayStr)
+    } else if (mode === 'future') {
+      setIsTodayMode(false)
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
+      setSelectedDate(tomorrowStr)
     } else {
       setIsTodayMode(false)
       setSelectedDate(availableDates[1]) // Second most recent date
@@ -117,6 +156,7 @@ export default function ParkingDashboard() {
               isTodayMode={isTodayMode}
               onModeChange={handleModeChange}
               averageFullness={averageFullness[garage.id] || []}
+              tomorrowPredictions={tomorrowPredictions[garage.id] || []}
             />
           </div>
         ))}

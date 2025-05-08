@@ -137,6 +137,11 @@ async def init_available_dates():
     await _aggregate_till_today()
     # Update available dates
     AVAILABLE_DATES = await averaged_collection.distinct("day")
+    
+    # Add tomorrow's date to available dates
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    if tomorrow not in AVAILABLE_DATES:
+        AVAILABLE_DATES.append(tomorrow)
 
 async def get_available_dates() -> List[str]:
     return AVAILABLE_DATES

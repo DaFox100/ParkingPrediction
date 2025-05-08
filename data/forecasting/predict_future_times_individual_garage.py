@@ -103,7 +103,7 @@ SHORT_HYPER_PARAMS: Dict[str, Dict[str, Any]] = {
 
 # long model hyperparameters
 def _build_long_model(garage: str, feature_dim: int) -> Model:
-    # look up this garage’s hyperparams, fall back to first dict entry if missing
+    # look up this garage's hyperparams, fall back to first dict entry if missing
     params = LONG_HYPER_PARAMS.get(
         garage,
         next(iter(LONG_HYPER_PARAMS.values()))
@@ -234,7 +234,7 @@ def _make_prediction(
     return combined
 
 
-def calculate_prediction(forecast_start: datetime) -> List[float]:
+def calculate_prediction(forecast_start: datetime, hours: int = 24) -> List[float]:
     extra_long_data = 0
 
     data: pd.DataFrame = load_data_from_mongodb(forecast_start)
@@ -276,7 +276,7 @@ def calculate_prediction(forecast_start: datetime) -> List[float]:
     
     prediction: np.ndarray = _make_prediction(long_data, short_data, long_garage_models, short_garage_models, short_feature_shape, long_feature_shape)
     start_time: pd.Timestamp = pd.Timestamp(forecast_start)
-    end_time: pd.Timestamp = pd.Timestamp(forecast_start + pd.Timedelta(days=1))
+    end_time: pd.Timestamp = pd.Timestamp(forecast_start + pd.Timedelta(hours=hours))
     values = utils.plot_prediction(prediction, short_data, data, start_time, end_time)
     return values
 
