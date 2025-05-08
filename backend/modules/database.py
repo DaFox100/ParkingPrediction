@@ -101,11 +101,48 @@ async def get_database():
     """Get database connection"""
     return db
 
+async def _aggregate_till_today():
+        # Get today's date
+    today = datetime.now().date()
+    
+    # Find the most recent complete aggregated date
+    pipeline = [
+        {"$match": { "complete": True}},
+        {"$sort": {"day": -1}},
+        {"$limit": 1}]
+    
+    result = await averaged_collection.aggregate(pipeline).to_list(length=1)
+    
+    if not result or result[0]["day"] == today.strftime("%Y-%m-%d"):
+        return
+    
+    most_recent_complete = datetime.strptime(result[0]["day"], "%Y-%m-%d").date()
+    
+    # Generate all dates between most_recent_complete and today (inclusive)
+    current_date = most_recent_complete + timedelta(days=1)
+    dates_to_aggregate = []
+    
+    while current_date <= today:
+        date_str = current_date.strftime("%Y-%m-%d")
+        dates_to_aggregate.append(date_str)
+        current_date += timedelta(days=1)
+    
+    # Aggregate data for each missing date
+    for date_str in dates_to_aggregate:
+        await _aggregate_hourly_data_for_date(date_str)
+
 async def init_available_dates():
     global averaged_collection
     global AVAILABLE_DATES
+    await _aggregate_till_today()
+    # Update available dates
     AVAILABLE_DATES = await averaged_collection.distinct("day")
     
+    # Add tomorrow's date to available dates
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    if tomorrow not in AVAILABLE_DATES:
+        AVAILABLE_DATES.append(tomorrow)
+
 async def get_available_dates() -> List[str]:
     return AVAILABLE_DATES
 
@@ -231,7 +268,7 @@ async def _aggregate_hourly_data():
                 })
                 
                 if existing_doc and existing_doc["complete"] is True:
-                    print(f"Skipping {date_str} for garage {garage_id} - already complete")
+                    # print(f"Skipping {date_str} for garage {garage_id} - already complete")
                     continue
                 
                 pipeline = [

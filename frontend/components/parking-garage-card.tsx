@@ -1,24 +1,11 @@
 "use client"
 import { RefreshCw, Calendar } from "lucide-react"
 import { useState, useEffect } from "react"
-import type { GarageData } from "@/lib/types"
+import type { GarageData, ParkingGarageCardProps } from "@/lib/types"
 import TrendChart from "./trend-chart"
 import DetailedGarageChart from "./detailed-garage-chart"
 import { formatDate } from "@/lib/utils"
 import { getAvailableDates, getGarageById, getAverageFullness } from "@/lib/data"
-
-interface ParkingGarageCardProps {
-  garage: GarageData
-  isExpanded: boolean
-  onGarageClick: (id: string) => void
-  onRefresh: () => void
-  selectedDate: string
-  onDateChange: (date: string) => void
-  availableDates: string[]
-  isTodayMode: boolean
-  onModeChange: (mode: 'today' | 'historical') => void
-  averageFullness: number[]
-}
 
 export default function ParkingGarageCard({ 
   garage, 
@@ -30,7 +17,8 @@ export default function ParkingGarageCard({
   availableDates,
   isTodayMode,
   onModeChange,
-  averageFullness
+  averageFullness,
+  tomorrowPredictions
 }: ParkingGarageCardProps) {
   const { id, name, currentOccupancy, trend, trendDirection, nextHour } = garage
   const [garageData, setGarageData] = useState(garage)
@@ -39,6 +27,8 @@ export default function ParkingGarageCard({
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const isToday = selectedDate === todayStr
+  const isTomorrow = selectedDate > todayStr
+  const isFuture = selectedDate > todayStr && selectedDate <= new Date(today.setDate(today.getDate() + 1)).toISOString().split('T')[0]
 
   useEffect(() => {
     setGarageData(garage)
@@ -47,6 +37,9 @@ export default function ParkingGarageCard({
   const handleDateChange = async (date: string) => {
     onDateChange(date)
   }
+
+  // Use the hourlyData directly from garageData since getParkingData already handles predictions
+  const hourlyData = garageData.hourlyData
 
   return (
     <div
@@ -76,7 +69,9 @@ export default function ParkingGarageCard({
                       {Math.abs(garageData.trend)}% next hour
                     </p>
                   ) : (
-                    <p className="text-xl md:text-2xl text-gray-400">Historical Mode</p>
+                    <p className="text-xl md:text-2xl text-gray-400">
+                      {isTomorrow ? "Prediction Mode" : "Historical Mode"}
+                    </p>
                   )}
                 </>
               )}
@@ -102,15 +97,17 @@ export default function ParkingGarageCard({
                         {Math.abs(garageData.trend)}% next hour
                       </p>
                     ) : (
-                      <p className="text-2xl md:text-3xl text-gray-400">Historical Mode</p>
+                      <p className="text-2xl md:text-3xl text-gray-400">
+                        {isTomorrow ? "Prediction Mode" : "Historical Mode"}
+                      </p>
                     )}
                   </>
                 )}
               </div>
               <div className="w-60 h-32 relative ml-4 mb-10">
                 <TrendChart 
-                  rawData={garageData.hourlyData.flatMap(hour => hour.rawData || [])}
-                  predictions={garageData.hourlyData.map(hour => hour.occupancy)}
+                  rawData={hourlyData.flatMap(hour => hour.rawData || [])}
+                  predictions={hourlyData.map(hour => hour.occupancy)}
                   direction={garageData.trendDirection} 
                 />
               </div>
@@ -162,7 +159,7 @@ export default function ParkingGarageCard({
             </div>
           ) : (
             <DetailedGarageChart 
-              data={garageData.hourlyData} 
+              data={hourlyData} 
               selectedDate={selectedDate} 
               isTodayMode={isTodayMode}
               onModeChange={onModeChange}

@@ -27,18 +27,31 @@ south_predictions: List[int] = []
 west_predictions: List[int] = []
 south_campus_predictions: List[int] = []
 
+# Global variables to store tomorrow's predictions
+north_predictions_tomorrow: List[int] = []
+south_predictions_tomorrow: List[int] = []
+west_predictions_tomorrow: List[int] = []
+south_campus_predictions_tomorrow: List[int] = []
+
 async def update_prediction():
     """Update the global prediction variables with new predictions."""
     global north_predictions, south_predictions, west_predictions, south_campus_predictions
+    global north_predictions_tomorrow, south_predictions_tomorrow, west_predictions_tomorrow, south_campus_predictions_tomorrow
     
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    garage_predictions = await run_in_threadpool(calculate_prediction, today)
+    garage_predictions = await run_in_threadpool(calculate_prediction, today, hours=48)
     
-    # Store predictions in global variables
-    north_predictions = garage_predictions[2]
-    south_predictions = garage_predictions[0]
-    west_predictions = garage_predictions[1]
-    south_campus_predictions = garage_predictions[3]
+    # Store first 24 hours in current predictions
+    north_predictions = garage_predictions[2][:24]
+    south_predictions = garage_predictions[0][:24]
+    west_predictions = garage_predictions[1][:24]
+    south_campus_predictions = garage_predictions[3][:24]
+    
+    # Store next 24 hours in tomorrow predictions
+    north_predictions_tomorrow = garage_predictions[2][24:]
+    south_predictions_tomorrow = garage_predictions[0][24:]
+    west_predictions_tomorrow = garage_predictions[1][24:]
+    south_campus_predictions_tomorrow = garage_predictions[3][24:]
 
 # Response model that returns the raw data
 class DataResponse(BaseModel):
@@ -121,6 +134,20 @@ async def get_predictions(garage: str) -> List[float]:
         return west_predictions
     elif garage == "south_campus":
         return south_campus_predictions
+    else:
+        raise HTTPException(status_code=400, detail="Invalid garage name")
+
+@router.get("/predictions-tomorrow/{garage}")
+async def get_predictions_tomorrow(garage: str) -> List[float]:
+    """Get tomorrow's predictions for a specific garage."""
+    if garage == "north":
+        return north_predictions_tomorrow
+    elif garage == "south":
+        return south_predictions_tomorrow
+    elif garage == "west":
+        return west_predictions_tomorrow
+    elif garage == "south_campus":
+        return south_campus_predictions_tomorrow
     else:
         raise HTTPException(status_code=400, detail="Invalid garage name")
 
