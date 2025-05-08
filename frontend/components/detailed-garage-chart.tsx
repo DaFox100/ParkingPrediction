@@ -39,6 +39,7 @@ export default function DetailedGarageChart({ data, selectedDate, isTodayMode, o
     } else if (isFuture) {
       onModeChange('future')
     } else if (!isToday && !isFuture && isTodayMode) {
+      // Only switch to historical mode if we're not already in it
       onModeChange('historical')
     }
   }, [selectedDate, isToday, isFuture, isTodayMode, onModeChange])

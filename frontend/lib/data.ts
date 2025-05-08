@@ -77,11 +77,20 @@ export async function getParkingData(date?: string): Promise<GarageData[]> {
         const isFuture = isToday && new Date().getHours() < index
         const isCurrentHour = isToday && new Date().getHours() === index
         
-        // If it's the current hour and we don't have data yet, use the previous hour's data
+        // If it's the current hour, use the most recent raw data point
         let occupancy = value
-        if (isCurrentHour && value === null) {
-          const prevHour = (index - 1 + 24) % 24 // Handle wrap-around at midnight
-          occupancy = data.hourly_values[prevHour]
+        if (isCurrentHour) {
+          const currentHourRawData = data.raw_data.filter((point: RawDataPoint) => 
+            point.time.startsWith(`${hour}:`)
+          )
+          if (currentHourRawData.length > 0) {
+            // Use the most recent raw data point
+            occupancy = currentHourRawData[currentHourRawData.length - 1].value
+          } else if (value === null) {
+            // If no raw data, fall back to previous hour's data
+            const prevHour = (index - 1 + 24) % 24 // Handle wrap-around at midnight
+            occupancy = data.hourly_values[prevHour]
+          }
         }
         
         // If still null, use predictions for future hours or 0 for past hours

@@ -110,10 +110,11 @@ export default function ParkingDashboard() {
   const handleModeChange = (mode: 'today' | 'historical' | 'future') => {
     if (availableDates.length < 2) return
 
+    const today = new Date()
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
     if (mode === 'today') {
       setIsTodayMode(true)
-      const today = new Date()
-      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
       setSelectedDate(todayStr)
     } else if (mode === 'future') {
       setIsTodayMode(false)
@@ -122,8 +123,11 @@ export default function ParkingDashboard() {
       const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
       setSelectedDate(tomorrowStr)
     } else {
+      // For historical mode, don't change the date if one is already selected
       setIsTodayMode(false)
-      setSelectedDate(availableDates[1]) // Second most recent date
+      if (!selectedDate || selectedDate === todayStr) {
+        setSelectedDate(availableDates[1]) // Second most recent date
+      }
     }
   }
 
