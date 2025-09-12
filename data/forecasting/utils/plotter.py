@@ -13,27 +13,28 @@ def plot_prediction(
     # data = pd.DataFrame(data)
     # data['date'] = pd.to_datetime(data['date'])
     
+
     future_length = len(prediction)
     lead_steps = 4
     transition_length = lead_steps
     visible_real = short_data.values[-future_length - lead_steps : -lead_steps, :4]
     visible_time = pd.to_datetime(data[-future_length - lead_steps : -lead_steps]["date"]).tolist()
 
-    # Instead of forcing the first prediction to equal the last real value, we let it be predicted.
-    # Build future timestamps starting from last visible real time + an appropriate increment:
-    last_visible_time = visible_time[-1]
-    if last_visible_time.hour >= 21 or last_visible_time.hour < 6:
-        initial_increment = pd.Timedelta(hours=1)
-    else:
-        initial_increment = pd.Timedelta(minutes=10)
-    date_pred_x = [last_visible_time + initial_increment]
-    for _ in range(1, future_length):
-        last = date_pred_x[-1]
-        if last.hour >= 21 or last.hour < 6:
-            next_time = last + pd.Timedelta(hours=1)
+    # Use the actual interval from the resampled data for prediction timestamps
+    if len(visible_time) > 1:
+        # Calculate the most common interval in seconds
+        intervals = np.diff([dt.value for dt in pd.to_datetime(visible_time)])
+        if len(intervals) > 0:
+            interval = pd.Timedelta(seconds=int(np.median(intervals) / 1e9))
         else:
-            next_time = last + pd.Timedelta(minutes=10)
-        date_pred_x.append(next_time)
+            interval = pd.Timedelta(minutes=10)
+    else:
+        interval = pd.Timedelta(minutes=10)
+
+    last_visible_time = visible_time[-1]
+    date_pred_x = [last_visible_time + interval]
+    for _ in range(1, future_length):
+        date_pred_x.append(date_pred_x[-1] + interval)
 
     # Apply a smoother transition (real → predicted) on the blend window
     actual_blend    = short_data.values[-lead_steps:, :4]  # real values for blending
@@ -49,19 +50,19 @@ def plot_prediction(
     )
 
     # # Final Plot
-    # plt.figure(figsize=(12, 6))
-    # for i in range(4):
-    #     actual_y = visible_real[:, i]
-    #     plt.plot(visible_time, actual_y, label=f'Actual Feature {i+1}')
-    #     plt.plot(date_pred_x, prediction[:, i], '--', label=f'Predicted Feature {i+1}')
+    plt.figure(figsize=(12, 6))
+    for i in range(4):
+        actual_y = visible_real[:, i]
+        plt.plot(visible_time, actual_y, label=f'Actual Feature {i+1}')
+        plt.plot(date_pred_x, prediction[:, i], '--', label=f'Predicted Feature {i+1}')
 
-    # plt.xlabel("Time")
-    # plt.ylabel("Value")
-    # plt.title("Actual vs. Smoothed Forecast with Adjusted Scaler Usage")
-    # plt.legend()
-    # plt.grid(True)
-    # plt.show()
-    # print("Plot shown here")
+    plt.xlabel("Time")
+    plt.ylabel("Value")
+    plt.title("Actual vs. Smoothed Forecast with Adjusted Scaler Usage")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+    print("Plot shown here")
 
     # If start_time and end_time are provided, extract hourly values for all garages
     if start_time is not None and end_time is not None:

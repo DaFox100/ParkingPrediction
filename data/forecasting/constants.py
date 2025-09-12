@@ -15,8 +15,8 @@ GARAGE_NAMES = ["south", "west", "north", "south_campus"]
 
 # ── TRAINING CONSTANTS ───────────────────────────────────────────────────────────
 # Define parameters for long model
-LONG_SEQ = 8
-LONG_FUTURE_STEPS = 196
+LONG_SEQ = 1
+LONG_FUTURE_STEPS = 288
 
 # Define parameters for short model
 SHORT_SEQ = 16
@@ -25,4 +25,4 @@ SHORT_FUTURE_STEPS = 16
 ENABLE_TIME_ENCODING: bool          = True
 ENABLE_INSTR_DAY: bool              = True
 ENABLE_INSTR_NEXT_DAY: bool         = True
-ENABLE_EVENT_ENCODING: bool         = True
+ENABLE_EVENT_ENCODING: bool         = False

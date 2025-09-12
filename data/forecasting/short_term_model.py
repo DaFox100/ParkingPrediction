@@ -1,11 +1,13 @@
 import os
 import numpy as np
 import pandas as pd
+import joblib
 from data.forecasting.keras_model_file import train_model
 from sklearn.preprocessing import MinMaxScaler
 
 from data.forecasting.constants import (
-    LOGS_DIRECTORY
+    LOGS_DIRECTORY,
+    MODEL_DIRECTORY
 )
 
 def train_short_model(model, batch_size, future_steps, test_split, seq_size, name, training_epochs):
@@ -18,7 +20,7 @@ def train_short_model(model, batch_size, future_steps, test_split, seq_size, nam
     data = pd.read_csv(f"{LOGS_DIRECTORY}/log.csv")
 
     # Drop unnecessary columns
-    data = data.drop(columns=["Unnamed: 0", 'south density', 'west density', 'north density', 'south compus density'])
+    data = data.drop(columns=['South_Traffic_density', 'West_Traffic_density', 'North_Traffic_density', 'SouthCampus_Traffic_density'])
     
     # Drop original time columns
     data = data.drop(columns=[data.columns[0]])
@@ -27,8 +29,8 @@ def train_short_model(model, batch_size, future_steps, test_split, seq_size, nam
     train_size = int(len(data) * test_split)
     train_data = data.iloc[:train_size]
     test_data = data.iloc[train_size:]
-
-    scaler = MinMaxScaler() # Scalers are used to normalize the data, this makes it easier for the model to learn the data
+    
+    scaler = MinMaxScaler().fit(data)
     scaler.fit(train_data) # Fit the scaler to the training data
 
     # Transform the data using the scaler

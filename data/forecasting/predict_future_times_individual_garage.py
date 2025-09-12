@@ -9,10 +9,13 @@ sys.path.append(str(project_root))
 
 import numpy as np
 import pandas as pd
+import datetime as dt
+import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler
-from typing import List, Tuple, Any, Dict, Optional, Union
+from typing import List, Any, Dict
 from keras import Model
 from datetime import datetime
+import matplotlib.pyplot as plt
 
 
 # Try to import using the full path first, fall back to local imports if that fails
@@ -20,7 +23,7 @@ try:
     from data.forecasting.keras_model_file import build_model
     from data.forecasting.short_term_model import train_short_model
     from data.forecasting.long_term_model import train_long_model
-    from data.forecasting.data_functions import add_cyclical_time_encoding, add_event_impact_features,add_instruction_days, load_data_from_mongodb
+    from data.forecasting.data_functions import add_cyclical_time_encoding, add_event_impact_features,add_instruction_days, load_data_from_mongodb, export_db_to_csv
     from data.forecasting import utils
     from data.forecasting.constants import (
         MODEL_DIRECTORY,
@@ -52,100 +55,104 @@ except ImportError:
         ENABLE_EVENT_ENCODING
     )
 # control flags  [True,True,True,True] [False,False,False,False] (for easy copy paste)
-LONG_TRAINING_MASK: List[bool]      = [False,False,False,False]
+LONG_TRAINING_MASK: List[bool]      = [False,True,True,True]
 SHORT_TRAINING_MASK: List[bool]     = [False,False,False,False]
 
 LONG_HYPER_PARAMS: Dict[str, Dict[str, Any]] = {
-    "south": {
-        "lstm_neurons_list": [192, 32, 192],
-        "dropout": 0.1,
-        "learning_rate": 2e-5,
-        "activation": "linear",},
-    "west": {
-        "lstm_neurons_list": [192, 32, 192],
-        "dropout": 0.1,
-        "learning_rate": 2e-5,
-        "activation": "linear",},
-    "north": {
-        "lstm_neurons_list": [192, 32, 192],
-        "dropout": 0.1,
-        "learning_rate": 2e-5,
-        "activation": "linear",},
-    "south_campus": {
-        "lstm_neurons_list": [512, 64, 512],
-        "dropout": 0.1,
-        "learning_rate": 1e-5,
-        "activation": "linear",}
+    "south":        {'lstm_neurons_list': [32, 192, 312], 'dropout': 0.4, 'learning_rate': 0.002, 'activation': 'hard_tanh', 'optimizer': 'rmsprop', 'batch_size': 128},
+    "west":         {'lstm_neurons_list': [32, 192, 312], 'dropout': 0.4, 'learning_rate': 0.002, 'activation': 'hard_tanh', 'optimizer': 'rmsprop', 'batch_size': 128},
+    "north":        {'lstm_neurons_list': [32, 192, 312], 'dropout': 0.4, 'learning_rate': 0.002, 'activation': 'hard_tanh', 'optimizer': 'rmsprop', 'batch_size': 128},
+    "south_campus": {'lstm_neurons_list': [32, 192, 312], 'dropout': 0.4, 'learning_rate': 0.002, 'activation': 'hard_tanh', 'optimizer': 'rmsprop', 'batch_size': 128},
 }
 
 SHORT_HYPER_PARAMS: Dict[str, Dict[str, Any]] = {
     "south": {
         "lstm_neurons_list": [64, 16, 64],
         "dropout": 0.10,
-        "learning_rate": 1e-4,
+        "learning_rate": 1e-3,
         "activation": "celu",},
     "west": {
         "lstm_neurons_list": [64, 16, 64],
         "dropout": 0.10,
-        "learning_rate": 1e-4,
+        "learning_rate": 1e-3,
         "activation": "celu",},
     "north": {
         "lstm_neurons_list": [64, 16, 64],
         "dropout": 0.10,
-        "learning_rate": 1e-4,
+        "learning_rate": 1e-3,
         "activation": "celu",},
     "south_campus": {
         "lstm_neurons_list": [64, 16, 64],
         "dropout": 0.10,
-        "learning_rate": 1e-4,
+        "learning_rate": 1e-3,
         "activation": "celu",}
 }
 
 # long model hyperparameters
-def _build_long_model(garage: str, feature_dim: int) -> Model:
+
+def _build_long_model(garage_no: int, garage: str, feature_dim: int) -> Model:
     # look up this garage's hyperparams, fall back to first dict entry if missing
     params = LONG_HYPER_PARAMS.get(
         garage,
         next(iter(LONG_HYPER_PARAMS.values()))
     )
+        # Select optimizer
+    if   params["optimizer"] == "adam":
+        optimizer = tf.keras.optimizers.Adam(learning_rate=params["learning_rate"])
+    elif params["optimizer"] == "adamw":
+        optimizer = tf.keras.optimizers.AdamW(learning_rate=params["learning_rate"])
+    elif params["optimizer"] == "nadam":
+        optimizer = tf.keras.optimizers.Nadam(learning_rate=params["learning_rate"])
+    elif params["optimizer"] == "rmsprop":
+        optimizer = tf.keras.optimizers.RMSprop(learning_rate=params["learning_rate"])
+    elif params["optimizer"] == "lion":
+        optimizer = tf.keras.optimizers.Lion(learning_rate=params["learning_rate"])
+    elif params["optimizer"] == "adadelta":
+        optimizer = tf.keras.optimizers.Adadelta(learning_rate=params["learning_rate"])
+    elif params["optimizer"] == "adamax":
+        optimizer = tf.keras.optimizers.Adamax(learning_rate=params["learning_rate"])
+    
     return build_model(
         lstm_neurons_list = params["lstm_neurons_list"],
         dropout           = params["dropout"],
-        learning_rate     = params["learning_rate"],
         seq_size          = LONG_SEQ,
-        activation        = params.get("activation", "linear"),
+        activation        = params.get("activation"),
         n_feature         = feature_dim,
         future_steps      = LONG_FUTURE_STEPS,
-        garage_no         = garage
+        garage_no         = garage_no,
+        optimizer         = optimizer
     )
     
 # short model hyperparameters 
-def _build_short_model(garage: str, feature_dim: int) -> Model:
+def _build_short_model(garage_no: int, garage: str, feature_dim: int) -> Model:
     params = SHORT_HYPER_PARAMS.get(
         garage,
         next(iter(SHORT_HYPER_PARAMS.values()))
     )
+    optimizer = tf.keras.optimizers.AdamW(learning_rate=params["learning_rate"])
     return build_model(
         lstm_neurons_list = params["lstm_neurons_list"],
         dropout           = params["dropout"],
-        learning_rate     = params["learning_rate"],
         seq_size          = SHORT_SEQ,
-        activation        = params.get("activation", "celu"),
+        activation        = params.get("activation"),
         n_feature         = feature_dim,
         future_steps      = SHORT_FUTURE_STEPS,
-        garage_no         = garage
+        garage_no         = garage_no,
+        optimizer         = optimizer
     )
     
-def _train_long(garage: str, model: Model) -> None:
+def _train_long(garage: str, model: Model, data:pd.DataFrame) -> None:
     print(f"training long model: {garage}")
+    params = LONG_HYPER_PARAMS.get(garage,next(iter(LONG_HYPER_PARAMS.values())))
     train_long_model(
         model=model,
-        training_epochs=10,
-        batch_size=32,
+        training_epochs=50,
+        batch_size=params["batch_size"],
         future_steps=LONG_FUTURE_STEPS,
-        test_split=0.80,
+        test_split=0.98,
         seq_size=LONG_SEQ,
-        name=f"long_model_{garage}"
+        name=f"long_model_{garage}",
+        data = data
     )
 
 
@@ -153,12 +160,12 @@ def _train_short(garage: str, model: Model) -> None:
     print(f"training short model: {garage}")
     train_short_model(
         model=model,
-        training_epochs=25,
-        batch_size=32,
+        training_epochs=50,
+        batch_size=1024,
         future_steps=SHORT_FUTURE_STEPS,
         test_split=0.8,
         seq_size=SHORT_SEQ,
-        name=f"short_model_{garage}"
+        name=f"short_model_{garage}",
     )
  
 def load_or_fit_scaler(scaler_path, data: pd.DataFrame) -> MinMaxScaler:
@@ -199,14 +206,14 @@ def _make_prediction(
     try:
         for i, garage in enumerate(GARAGE_NAMES):
             long_models[i].load_weights(
-                MODEL_DIRECTORY / f"long_model_{garage}.weights.h5"
+                MODEL_DIRECTORY / f"long_model_{garage}_best.keras"
             )
             short_models[i].load_weights(
-                MODEL_DIRECTORY / f"short_model_{garage}.weights.h5"
+                MODEL_DIRECTORY / f"short_model_{garage}_best.keras"
             )
     except Exception:
         print("Could not load weights, please verify you have existing weight files, exiting.")
-        exit(-1)
+        
 
     # prepare batches
     short_batch = scaled_short.values[-SHORT_SEQ:].reshape(1, SHORT_SEQ, short_dim)
@@ -217,6 +224,8 @@ def _make_prediction(
     for i, garage in enumerate(GARAGE_NAMES):
         lp = long_models[i].predict(long_batch, verbose=0)[0]
         sp = short_models[i].predict(short_batch, verbose=0)[0]
+        # long_preds.append(scaler_long.inverse_transform(lp)[:, i])
+        # short_preds.append(scaler_short.inverse_transform(sp)[:, i])
         long_preds.append(np.clip(scaler_long.inverse_transform(lp)[:, i], 0, 1))
         short_preds.append(np.clip(scaler_short.inverse_transform(sp)[:, i], 0, 1))
 
@@ -238,8 +247,8 @@ def calculate_prediction(forecast_start: datetime, hours: int = 24) -> List[floa
     extra_long_data = 0
 
     data: pd.DataFrame = load_data_from_mongodb(forecast_start)
-    short_data: pd.DataFrame = data.drop(columns=["date"]).copy() # Keep a copy of the raw density data (without date)
-    
+    init_data = data
+    short_data: pd.DataFrame = data.drop(columns=['date']).copy()
     # Process the data
     if ENABLE_INSTR_DAY:
         data = add_instruction_days(data)
@@ -257,31 +266,36 @@ def calculate_prediction(forecast_start: datetime, hours: int = 24) -> List[floa
     short_garage_models: List[Model] = []
     
     long_data: pd.DataFrame = data.drop(columns=['date']).copy()
-        
+    
+
     # Define parameters for long and short models
     long_feature_shape: int = short_data.shape[1] + extra_long_data
     short_feature_shape: int = short_data.shape[1]
     
     # remember the models will not load correctly if you changes this and don't re-train
     for garage_no in range(len(GARAGE_NAMES)):
-        long_garage_models.append(_build_long_model(garage_no, long_feature_shape))
-        short_garage_models.append(_build_short_model(garage_no, short_feature_shape))
+        long_garage_models.append(_build_long_model(garage_no, GARAGE_NAMES[garage_no], long_feature_shape))
+        short_garage_models.append(_build_short_model(garage_no, GARAGE_NAMES[garage_no], short_feature_shape))
     
     # Train models if the flag is true
+    data: pd.DataFrame = load_data_from_mongodb(dt.datetime.now(),100000)
     for garage_no, garage in enumerate(GARAGE_NAMES, start=0):
         if LONG_TRAINING_MASK[garage_no]:
-            _train_long(garage, long_garage_models[garage_no])
+            _train_long(garage, long_garage_models[garage_no],data)
         if SHORT_TRAINING_MASK[garage_no]:
             _train_short(garage, short_garage_models[garage_no])
-    
+    data = init_data
+
     prediction: np.ndarray = _make_prediction(long_data, short_data, long_garage_models, short_garage_models, short_feature_shape, long_feature_shape)
     start_time: pd.Timestamp = pd.Timestamp(forecast_start)
     end_time: pd.Timestamp = pd.Timestamp(forecast_start + pd.Timedelta(hours=hours))
     values = utils.plot_prediction(prediction, short_data, data, start_time, end_time)
     return values
 
+
 if __name__ == "__main__":
-    values = calculate_prediction(datetime(2025, 5, 3, 0, 0))
+    # values = calculate_prediction(datetime(year=2025,month=4,day=9,hour=6))
+    values = calculate_prediction(datetime.now()-dt.timedelta(days=2,hours=0))
     print_string = ""
     for list in values:
         print_string += "\nGarage " + str(values.index(list)) + ": "
