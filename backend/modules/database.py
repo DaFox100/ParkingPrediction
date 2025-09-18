@@ -10,6 +10,7 @@ from bson import ObjectId
 import pandas as pd
 import requests
 import time
+import socket
 
 load_dotenv()
 
@@ -164,6 +165,22 @@ async def insert_datapoint(data: Datapoint):
     """
     collection = db["datapoints"]
     await collection.insert_one(data.model_dump())
+
+def update_env_file():
+    # Get the local IP address of the host machine
+    hostname = socket.gethostname()
+    local_ip = socket.gethostbyname(hostname)
+    api_base_url = f"http://{local_ip}:8000/api"
+
+    # Construct the path to the .env.development file
+    parent_directory = os.getcwd()
+    env_file_path = os.path.join(parent_directory, "ParkingPrediction", "frontend", ".env.development")
+
+    # Update the .env.development file
+    with open(env_file_path, "w") as env_file:
+        env_file.write(f"NEXT_PUBLIC_API_BASE_URL={api_base_url}\n")
+    print(f"Updated .env.development with API_BASE_URL: {api_base_url}")
+
 
 async def close_connection():
     """Close the MongoDB connection"""
@@ -353,7 +370,7 @@ async def get_data_per_hour(date: str, garage_id: str) -> List[float | None]:
         new_date = MOST_RECENT_TIMESTAMP.strftime("%Y-%m-%d")
         
         # Delete existing aggregated data for this date
-        await averaged_collection.delete_many({"day": new_date})
+        # await averaged_collection.delete_many({"day": new_date})
         
         # Re-aggregate the data for this date
         await _aggregate_hourly_data_for_date(new_date)

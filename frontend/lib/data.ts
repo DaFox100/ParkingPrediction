@@ -1,6 +1,6 @@
 import type { GarageData, RawDataPoint, HourlyData } from "./types"
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000/api';
 
 // Get parking data from the API
 export async function getParkingData(date?: string): Promise<GarageData[]> {
@@ -61,7 +61,7 @@ export async function getParkingData(date?: string): Promise<GarageData[]> {
   // For today or past dates, make the API call
   const garageDataPromises = garages.map(async (id) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/data?date=${selectedDate}&garage_id=${id}`)
+      const response = await fetch(`${API_BASE_URL}/data?date=${selectedDate}&garage_id=${id}`)
       if (!response.ok) {
         throw new Error(`Failed to fetch data for ${id}`)
       }
@@ -70,42 +70,59 @@ export async function getParkingData(date?: string): Promise<GarageData[]> {
       // Get predictions for this garage only if viewing today's data
       const predictions = isToday ? await getPredictions(id) : null
       
-      // Convert hourly values to the format expected by the frontend
+      // Find the last real data point
+      let lastRealIndex = -1;
+      for (let i = 0; i < data.hourly_values.length; i++) {
+        if (data.hourly_values[i] !== null) {
+          lastRealIndex = i;
+        }
+      }
+
+      // Build hourlyData: real data up to lastRealIndex, then predictions after
       const hourlyData = data.hourly_values.map((value: number | null, index: number) => {
-        const hour = index.toString().padStart(2, '0')
-        const time = `${hour}:00`
-        const isFuture = isToday && new Date().getHours() < index
-        const isCurrentHour = isToday && new Date().getHours() === index
-        
+        const hour = index.toString().padStart(2, '0');
+        const time = `${hour}:00`;
+        let occupancy = value;
+        let forecast = false;
+        let predictedOccupancy = null;
+
+        // Only show predicted occupancy after last real data
+        if (index > lastRealIndex && predictions) {
+          const predIdx = index - lastRealIndex - 1;
+          occupancy = predictions[predIdx];
+          forecast = true;
+          predictedOccupancy = predictions[predIdx];
+        }
+
+        // Before lastRealIndex, do not show predicted occupancy
+        if (index <= lastRealIndex) {
+          predictedOccupancy = null;
+          forecast = false;
+        }
+
         // If it's the current hour, use the most recent raw data point
-        let occupancy = value
+        const isCurrentHour = isToday && new Date().getHours() === index;
         if (isCurrentHour) {
-          const currentHourRawData = data.raw_data.filter((point: RawDataPoint) => 
+          const currentHourRawData = data.raw_data.filter((point: RawDataPoint) =>
             point.time.startsWith(`${hour}:`)
-          )
+          );
           if (currentHourRawData.length > 0) {
-            // Use the most recent raw data point
-            occupancy = currentHourRawData[currentHourRawData.length - 1].value
-          } else if (value === null) {
-            // If no raw data, fall back to previous hour's data
-            const prevHour = (index - 1 + 24) % 24 // Handle wrap-around at midnight
-            occupancy = data.hourly_values[prevHour]
+            occupancy = currentHourRawData[currentHourRawData.length - 1].value;
+          } else if (value === null && index > 0) {
+            occupancy = data.hourly_values[index - 1];
           }
         }
-        
-        // If still null, use predictions for future hours or 0 for past hours
-        occupancy = occupancy !== null ? occupancy : (isFuture && predictions ? predictions[index] : 0)
-        
+
         return {
           time,
           occupancy,
-          predictedOccupancy: predictions ? predictions[index] : null,
-          forecast: isFuture,
-          rawData: data.raw_data.filter((point: RawDataPoint) => 
+          predictedOccupancy,
+          forecast,
+          rawData: data.raw_data.filter((point: RawDataPoint) =>
             point.time.startsWith(`${hour}:`)
           )
-        }
-      })
+        };
+      });
       
       // Calculate current occupancy and trend
       const currentHour = new Date().getHours()
@@ -156,15 +173,15 @@ export async function getGarageById(id: string): Promise<GarageData | undefined>
 // Get available dates from the API
 export async function getAvailableDates(): Promise<string[]> {
   try {
-    const response = await fetch('http://127.0.0.1:8000/api/dates')
+    const response = await fetch(`${API_BASE_URL}/dates`);
     if (!response.ok) {
-      throw new Error('Failed to fetch available dates')
+      throw new Error('Failed to fetch available dates');
     }
-    return await response.json()
+    return await response.json();
   } catch (error) {
-    console.error('Error fetching available dates:', error)
+    console.error('Error fetching available dates:', error);
     // Return today's date as fallback
-    return [new Date().toISOString().split('T')[0]]
+    return [new Date().toISOString().split('T')[0]];
   }
 }
 
@@ -201,15 +218,15 @@ function generateTrendData(current: number, trend: number) {
 // Get the latest update timestamp from the API
 export async function getLatestUpdate(): Promise<string> {
   try {
-    const response = await fetch('http://127.0.0.1:8000/api/latest-update')
+    const response = await fetch(`${API_BASE_URL}/latest-update`);
     if (!response.ok) {
-      throw new Error('Failed to fetch latest update timestamp')
+      throw new Error('Failed to fetch latest update timestamp');
     }
-    const data = await response.json()
-    return data.timestamp
+    const data = await response.json();
+    return data.timestamp;
   } catch (error) {
-    console.error('Error fetching latest update timestamp:', error)
-    return new Date().toISOString() // Return current time as fallback
+    console.error('Error fetching latest update timestamp:', error);
+    return new Date().toISOString(); // Return current time as fallback
   }
 }
 
@@ -227,29 +244,29 @@ export async function getPredictionsTomorrow(garage: string): Promise<number[]> 
 
 export async function getAverageFullness(garageId: string, selectedDate: string): Promise<number[]> {
   try {
-    const date = new Date(selectedDate)
-    const dayOfWeek = date.getDay() // 0 = Monday, 1 = Tuesday, etc.
+    const date = new Date(selectedDate);
+    const dayOfWeek = date.getDay(); // 0 = Monday, 1 = Tuesday, etc.
 
-    const response = await fetch(`http://127.0.0.1:8000/api/average-fullness/${garageId}/${dayOfWeek}`)
+    const response = await fetch(`${API_BASE_URL}/average-fullness/${garageId}/${dayOfWeek}`);
     if (!response.ok) {
-      throw new Error(`Failed to fetch average fullness for ${garageId}`)
+      throw new Error(`Failed to fetch average fullness for ${garageId}`);
     }
-    return await response.json()
+    return await response.json();
   } catch (error) {
-    console.error(`Error fetching average fullness for ${garageId}:`, error)
-    return Array(24).fill(0) // Return zeros as fallback
+    console.error(`Error fetching average fullness for ${garageId}:`, error);
+    return Array(24).fill(0); // Return zeros as fallback
   }
 }
 
 export async function getWeather(): Promise<{ temperature: number; condition: string }> {
   try {
-    const response = await fetch('http://127.0.0.1:8000/api/weather')
+    const response = await fetch(`${API_BASE_URL}/weather`);
     if (!response.ok) {
-      throw new Error('Failed to fetch weather data')
+      throw new Error('Failed to fetch weather data');
     }
-    return await response.json()
+    return await response.json();
   } catch (error) {
-    console.error('Error fetching weather data:', error)
-    return { temperature: 0, condition: 'unknown' }
+    console.error('Error fetching weather data:', error);
+    return { temperature: 0, condition: 'unknown' };
   }
 }

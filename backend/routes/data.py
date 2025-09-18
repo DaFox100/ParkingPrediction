@@ -1,9 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from pydantic import BaseModel
 from modules.database import get_garage_data, get_available_dates, get_data_per_hour, get_latest_timestamp, get_garage_averages
-from fastapi.concurrency import run_in_threadpool
 from pathlib import Path
 import sys
 
@@ -38,20 +37,34 @@ async def update_prediction():
     global north_predictions, south_predictions, west_predictions, south_campus_predictions
     global north_predictions_tomorrow, south_predictions_tomorrow, west_predictions_tomorrow, south_campus_predictions_tomorrow
     
-    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    garage_predictions = await run_in_threadpool(calculate_prediction, today, hours=48)
-    
-    # Store first 24 hours in current predictions
-    north_predictions = garage_predictions[2][:24]
-    south_predictions = garage_predictions[0][:24]
-    west_predictions = garage_predictions[1][:24]
-    south_campus_predictions = garage_predictions[3][:24]
-    
-    # Store next 24 hours in tomorrow predictions
-    north_predictions_tomorrow = garage_predictions[2][24:]
-    south_predictions_tomorrow = garage_predictions[0][24:]
-    west_predictions_tomorrow = garage_predictions[1][24:]
-    south_campus_predictions_tomorrow = garage_predictions[3][24:]
+    today = datetime.now()
+    print("calculating predictions staritng at this time:")
+    print(today)
+    # Calculate predictions for 48 hours, with 10-minute intervals
+    garage_predictions = calculate_prediction(today, hours=48)
+
+    # Each garage_predictions[i] is a list of predictions for every 10-min interval
+    intervals_per_day = 24
+    a = today.hour
+    # Store first 144 intervals (today) in current predictions
+    south_predictions = garage_predictions[0][:a-intervals_per_day]
+    west_predictions = garage_predictions[1][:a-intervals_per_day]
+    north_predictions = garage_predictions[2][:a-intervals_per_day]
+    south_campus_predictions = garage_predictions[3][:a-intervals_per_day]
+
+    # Calculate how many intervals until midnight
+    now = datetime.now()
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    minutes_until_midnight = int((midnight - now).total_seconds() // 60)
+    intervals_until_midnight = minutes_until_midnight // 60
+
+    # Tomorrow's predictions: start at midnight, next 144 intervals (24 hours)
+    start_idx = intervals_until_midnight
+    end_idx = start_idx + intervals_per_day
+    north_predictions_tomorrow = garage_predictions[2][start_idx:end_idx]
+    south_predictions_tomorrow = garage_predictions[0][start_idx:end_idx]
+    west_predictions_tomorrow = garage_predictions[1][start_idx:end_idx]
+    south_campus_predictions_tomorrow = garage_predictions[3][start_idx:end_idx]
 
 # Response model that returns the raw data
 class DataResponse(BaseModel):
@@ -117,11 +130,11 @@ async def get_latest_update():
     latest_timestamp = await get_latest_timestamp()
     if latest_timestamp:
         return {"timestamp": latest_timestamp.isoformat()}
-    else:
-        raise HTTPException(
-            status_code=404,
-            detail="No data available"
-        )
+    # else:
+    #     raise HTTPException(
+    #         status_code=404,
+    #         detail="No data available"
+    #     )
 
 @router.get("/predictions/{garage}")
 async def get_predictions(garage: str) -> List[float]:
