@@ -1,10 +1,10 @@
 import csv
-import time
+import time as t
+from selenium import webdriver
+from selenium.webdriver.firefox.options import Options
+from bs4 import BeautifulSoup
 from datetime import datetime
 from dateutil import parser
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
 
 # Pre-defined sport encoding mapping (extracted from sjsu_home_games.csv)
 sport_mapping = {
@@ -24,18 +24,23 @@ sport_mapping = {
     "Men's Soccer": 14,
     "Women's Volleyball": 15,
     "Women's Beach Volleyball": 16,
+    "Track and Field": 17,
 }
 
-# Setup headless Chrome options (uncomment headless for silent mode)
+# Get the current year and month
+current_year = datetime.now().year
+current_month = datetime.now().month
+
+# Generate years and months dynamically
+years = [str(year) for year in range(current_year - 2, current_year + 1)]  # Scrape data for the past 2 years and current year
+months = [f"{month:02}" for month in range(1, 13)]  # All months from January to December
+
+# Set up Selenium with headless Firefox
 options = Options()
-# options.headless = True
+options.headless = True
 
 # Launch browser
-driver = webdriver.Chrome(options=options)
-
-months24 = ['01','02','03','04','05','06','07','08','09','10','11','12']
-months25 = ['01','02','03','04','05']
-years = ['2024','2025']
+driver = webdriver.Firefox(options=options)
 
 # Prepare CSV file with two columns: Time and Sport.
 with open("sjsu_home_games.csv", mode="w", newline="", encoding="utf-8") as file:
@@ -43,64 +48,48 @@ with open("sjsu_home_games.csv", mode="w", newline="", encoding="utf-8") as file
     writer.writerow(["Time", "Sport"])  # CSV Header
 
     for year in years:
-        months = months24 if year == '2024' else months25
-
         for month in months:
+            # Skip future months in the current year
+            if int(year) == current_year and int(month) > current_month:
+                continue
+
             try:
                 url = f'https://sjsuspartans.com/all-sports-schedule?view=calendar&month={year}-{month}&event-time=past'
                 driver.get(url)
 
                 print(f"🔄 Scraping {year}-{month}... Waiting for JavaScript to load...")
-                time.sleep(3)  # Allow content to load
+                t.sleep(1)  # Allow content to load
 
-                events = driver.find_elements(By.CLASS_NAME, 'schedule-calendar-day')
+                # Get the rendered HTML
+                html = driver.page_source
+                soup = BeautifulSoup(html, 'html.parser')
+
+                events = soup.find_all(class_='schedule-calendar-day')
 
                 for event in events:
-                    day_num_elem = event.find_element(By.CLASS_NAME, 'schedule-calendar-day__number')
-                    day = day_num_elem.text.strip()
-                    if not day.isdigit():
-                        continue  # Skip non-date entries
+                    day_num_elem = event.find(class_='schedule-calendar-day__number')
+                    day = day_num_elem.text.strip() if day_num_elem else ""
 
-                    date = f"{month}/{day}/{year}"
-                    home_events = event.find_elements(By.CLASS_NAME, 'schedule-calendar-event--home')
+                    button_elem = event.find(class_='schedule-calendar-event__button')
+                    time_and_sport = button_elem.text.strip() if button_elem else ""
 
-                    for home_event in home_events:
-                        button = home_event.find_element(By.CLASS_NAME, 'schedule-calendar-event__button')
-                        full_text = button.text.strip()
-
-                        parts = full_text.split("-")
-                        time_str = parts[0].strip() if len(parts) > 0 else ""
-                        sport = parts[1].strip() if len(parts) > 1 else ""
-
-                        # Convert time_str from 12-hour to datetime
-                        if time_str:
-                            try:
-                                converted_time = parser.parse(time_str)
-                            except ValueError:
-                                if time_str == "All Day":
-                                    continue
-                                elif time_str == "TBD":
-                                    continue
+                    if day and time_and_sport:
+                        # Extract time and sport from the button text
+                        time, sport = time_and_sport.split(" - ", 1) if " - " in time_and_sport else ("", time_and_sport)
+                        if (time == "All Day "):
+                            date_str = f"{year}-{month}-{day} 8:00 AM PST"
                         else:
-                            converted_time = ""
+                            date_str = f"{year}-{month}-{day} {time}"
+                        date_obj = parser.parse(date_str)
+                        sport_code = sport_mapping.get(sport.strip(), "0")
 
-                        # Combine the date and time into a datetime object and then ISO format string.
-                        if isinstance(converted_time, datetime):
-                            date_obj = datetime.strptime(date, "%m/%d/%Y")
-                            combined_dt = date_obj.replace(hour=converted_time.hour, minute=converted_time.minute, second=converted_time.second)
-                            combined_time_str = combined_dt.isoformat()
-                        else:
-                            combined_time_str = f"{date} {converted_time}"
+                        # Format the date without timezone
+                        formatted_date = date_obj.strftime("%Y-%m-%dT%H:%M:%S")
 
-                        # Use pre-defined mapping; default to 0 if sport is not in the map.
-                        sport_code = sport_mapping.get(sport, 0)
-                        writer.writerow([combined_time_str, sport_code])
-
-                print(f"✅ Done: {year}-{month}")
+                        writer.writerow([formatted_date, sport_code])
 
             except Exception as e:
-                print(f"❌ Error on {year}-{month}: {e}")
+                print(f"❌ Error scraping {year}-{month}: {e}")
 
-# Close browser
+# Close the browser
 driver.quit()
-print("🏁 All home games saved to 'sjsu_home_games.csv'")

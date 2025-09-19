@@ -1,18 +1,26 @@
+import gc
+import numpy as np
 import tensorflow as tf
+from datetime import datetime
 from tensorflow import keras
-from tensorflow.keras.losses import Loss
+from keras.losses import Loss
 from keras.callbacks import ModelCheckpoint
-import warnings
-from keras.mixed_precision import set_global_policy
-set_global_policy('mixed_float16')
 
-from data.forecasting.constants import (
-    MODEL_DIRECTORY
-)
+from data.forecasting.constants import MODEL_DIRECTORY
 
-warnings.filterwarnings("ignore", category=UserWarning, module="keras.saving")
+physical_devices = tf.config.list_physical_devices('GPU')
+if physical_devices:
+    # Set memory growth to avoid allocation issues
+    policy = tf.keras.mixed_precision.Policy('mixed_float16')
+    tf.keras.mixed_precision.set_global_policy(policy)
+    tf.config.experimental.set_memory_growth(physical_devices[0], True)
+    tf.config.experimental.enable_op_determinism()
+    tf.random.set_seed(1)
 
-# Enable mixed precision
+    # Enable XLA JIT compilation for improved GPU performance
+    tf.config.optimizer.set_jit(True)
+else:
+    print("No GPU found, using CPU")
 
 # ── CUSTOM LOSS CLASS ───────────────────────────────────────────────────────────
 class _CustomMSESingleGarage(Loss):
@@ -20,6 +28,7 @@ class _CustomMSESingleGarage(Loss):
         super().__init__(name=name)
         self.garage_no = garage_no
 
+    @tf.function
     def call(self, y_true, y_pred):
         y_true_slice = y_true[:, :, self.garage_no]
         y_pred_slice = y_pred[:, :, self.garage_no]
@@ -83,28 +92,27 @@ def build_model(
 
     model = keras.Model(inputs=inputs, outputs=outputs)
 
-    #Choose loss function based on whether garage_no is specified
-    if garage_no is not None:
-        loss_fn = _CustomMSESingleGarage(garage_no)
-    else:
-        loss_fn = _CustomMSEFour
-    # Use Huber loss
-    # loss_fn = tf.keras.losses.Huber()
+    # Choose loss function based on whether garage_no is specified
+    loss_fn = _CustomMSESingleGarage(garage_no)
     model.compile(
         loss=loss_fn,
         optimizer=optimizer,
-        metrics=[tf.keras.metrics.MeanSquaredError()])
+        metrics=[tf.keras.metrics.MeanSquaredError()]
+    )
 
     return model
 
 # ── TRAINING FUNCTION ────────────────────────────────────────────────────────────
 def train_model(
     model,
-    X_train, Y_train,
-    X_test,  Y_test,
+    X_train,
+    Y_train,
+    X_test,
+    Y_test,
     batch_size,
     training_epochs,
     name):
+
     # Define a callback to save the model with the best validation loss
     checkpoint_path = f"{MODEL_DIRECTORY}/{name}_best.keras"
     checkpoint_callback = ModelCheckpoint(
@@ -115,23 +123,46 @@ def train_model(
         verbose=0
     )
 
-    reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.75, patience=3, min_lr=1e-7, verbose=1)
+    reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.75, patience=5, min_lr=1e-7, verbose=1)
 
     early_stopping = keras.callbacks.EarlyStopping(
         monitor="val_loss",
-        patience=6,
+        patience=12,
         restore_best_weights=True,
         verbose=1
     )
 
+    # Add TensorFlow Profiler callback
+    log_dir = "logs/profile/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+    profiler_callback = tf.keras.callbacks.TensorBoard(
+        log_dir=log_dir,
+        histogram_freq=1,
+        profile_batch="50,60",  # Profile batches 50 to 100
+        update_freq="batch"  # Update logs after every batch
+    )
+
+    # Convert arrays to np.float32 for efficient transfer
+    X_train = np.array(X_train, dtype=np.float32)
+    Y_train = np.array(Y_train, dtype=np.float32)
+    X_test = np.array(X_test, dtype=np.float32)
+    Y_test = np.array(Y_test, dtype=np.float32)
+
     # Train the model with the callback
     model.fit(
-        X_train, Y_train,
+        X_train,
+        Y_train,
         validation_data=(X_test, Y_test),
         epochs=training_epochs,
         batch_size=batch_size,
-        callbacks=[reduce_lr, checkpoint_callback, early_stopping])
+        callbacks=[reduce_lr, checkpoint_callback, early_stopping]
+    )
 
     # Load the best model weights before returning
     model.load_weights(checkpoint_path)
+
+    # Aggressively clean up callbacks and optimizer
+    del checkpoint_callback, reduce_lr, early_stopping, profiler_callback
+    del X_train, Y_train, X_test, Y_test
+    tf.keras.backend.clear_session()
+    gc.collect()
     return model

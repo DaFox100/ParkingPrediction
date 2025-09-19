@@ -1,0 +1,2 @@
+Best Models per Generation
+Generation 1: {'lstm_neurons_list': [113, 328], 'dropout': 0.299154508403407, 'learning_rate': 0.002344981525700762, 'activation': 'tanh', 'optimizer': 'rmsprop', 'batch_size': 256, 'lstm_layers': 2}, Loss: 0.006864116061478853

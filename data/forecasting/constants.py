@@ -25,4 +25,4 @@ SHORT_FUTURE_STEPS = 16
 ENABLE_TIME_ENCODING: bool          = True
 ENABLE_INSTR_DAY: bool              = True
 ENABLE_INSTR_NEXT_DAY: bool         = True
-ENABLE_EVENT_ENCODING: bool         = False
+ENABLE_EVENT_ENCODING: bool         = True

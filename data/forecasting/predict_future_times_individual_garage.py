@@ -59,9 +59,9 @@ LONG_TRAINING_MASK: List[bool]      = [False,True,True,True]
 SHORT_TRAINING_MASK: List[bool]     = [False,False,False,False]
 
 LONG_HYPER_PARAMS: Dict[str, Dict[str, Any]] = {
-    "south":        {'lstm_neurons_list': [32, 192, 312], 'dropout': 0.4, 'learning_rate': 0.002, 'activation': 'hard_tanh', 'optimizer': 'rmsprop', 'batch_size': 128},
-    "west":         {'lstm_neurons_list': [32, 192, 312], 'dropout': 0.4, 'learning_rate': 0.002, 'activation': 'hard_tanh', 'optimizer': 'rmsprop', 'batch_size': 128},
-    "north":        {'lstm_neurons_list': [32, 192, 312], 'dropout': 0.4, 'learning_rate': 0.002, 'activation': 'hard_tanh', 'optimizer': 'rmsprop', 'batch_size': 128},
+    "south":        {'lstm_neurons_list': [77, 73, 205, 216], 'lstm_layers': 4, 'dropout': 0.2500845427465502, 'learning_rate': 0.0018339163857906118, 'activation': 'tanh', 'optimizer': 'adamax', 'batch_size': 512},
+    "west":         {'lstm_neurons_list': [110, 183, 207, 508], 'lstm_layers': 4, 'dropout': 0.44826529785781433, 'learning_rate': 0.0004833113226494442, 'activation': 'sigmoid', 'optimizer': 'adam', 'batch_size': 256},
+    "north":        {'lstm_neurons_list': [327, 179, 417, 317], 'lstm_layers': 4, 'dropout': 0.5745106585317661, 'learning_rate': 0.0009967926629038712, 'activation': 'sigmoid', 'optimizer': 'adamw', 'batch_size': 256},
     "south_campus": {'lstm_neurons_list': [32, 192, 312], 'dropout': 0.4, 'learning_rate': 0.002, 'activation': 'hard_tanh', 'optimizer': 'rmsprop', 'batch_size': 128},
 }
 

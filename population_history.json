@@ -1,0 +1,327 @@
+[
+  {
+    "lstm_neurons_list": [
+      247
+    ],
+    "dropout": 0.6074992354607146,
+    "learning_rate": 0.004427028432613264,
+    "activation": "hard_sigmoid",
+    "optimizer": "lion",
+    "batch_size": 256,
+    "lstm_layers": 1,
+    "val_loss": 0.005871102213859558,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:31:47.624650",
+    "garage": "south_campus"
+  },
+  {
+    "lstm_neurons_list": [
+      197
+    ],
+    "dropout": 0.41287634747637647,
+    "learning_rate": 0.0015217329649263932,
+    "activation": "hard_sigmoid",
+    "optimizer": "adamax",
+    "batch_size": 1024,
+    "lstm_layers": 1,
+    "val_loss": 0.006212291773408651,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:31:47.624650",
+    "garage": "south_campus"
+  },
+  {
+    "lstm_neurons_list": [
+      162,
+      39,
+      118,
+      19
+    ],
+    "dropout": 0.848595953924961,
+    "learning_rate": 0.0019459942114219504,
+    "activation": "tanh",
+    "optimizer": "adamax",
+    "batch_size": 512,
+    "lstm_layers": 4,
+    "val_loss": 0.006214400287717581,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:31:47.624650",
+    "garage": "south_campus"
+  },
+  {
+    "lstm_neurons_list": [
+      287,
+      334,
+      263
+    ],
+    "dropout": 0.2959057145316516,
+    "learning_rate": 0.0038746890125922126,
+    "activation": "hard_sigmoid",
+    "optimizer": "adam",
+    "batch_size": 512,
+    "lstm_layers": 2,
+    "val_loss": 0.006249883212149143,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:31:47.624650",
+    "garage": "south_campus"
+  },
+  {
+    "lstm_neurons_list": [
+      273,
+      400,
+      356
+    ],
+    "dropout": 0.518252319124239,
+    "learning_rate": 0.00047238924298885195,
+    "activation": "hard_tanh",
+    "optimizer": "adamax",
+    "batch_size": 1024,
+    "lstm_layers": 3,
+    "val_loss": 0.006295040249824524,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:31:47.624650",
+    "garage": "south_campus"
+  },
+  {
+    "lstm_neurons_list": [
+      345
+    ],
+    "dropout": 0.2256554662010276,
+    "learning_rate": 0.0013646745406907337,
+    "activation": "hard_tanh",
+    "optimizer": "adam",
+    "batch_size": 256,
+    "lstm_layers": 1,
+    "val_loss": 0.006364514585584402,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:31:47.624650",
+    "garage": "south_campus"
+  },
+  {
+    "lstm_neurons_list": [
+      336,
+      265
+    ],
+    "dropout": 0.29810375558557656,
+    "learning_rate": 0.001270226172535453,
+    "activation": "hard_tanh",
+    "optimizer": "adam",
+    "batch_size": 256,
+    "lstm_layers": 2,
+    "val_loss": 0.006455150432884693,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:31:47.624650",
+    "garage": "south_campus"
+  },
+  {
+    "lstm_neurons_list": [
+      322,
+      398,
+      449
+    ],
+    "dropout": 0.6459692364722854,
+    "learning_rate": 0.0017223697804446313,
+    "activation": "hard_tanh",
+    "optimizer": "adam",
+    "batch_size": 256,
+    "lstm_layers": 1,
+    "val_loss": 0.008235294371843338,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:31:47.624650",
+    "garage": "south_campus"
+  },
+  {
+    "lstm_neurons_list": [
+      292,
+      352,
+      163
+    ],
+    "dropout": 0.44221200343415235,
+    "learning_rate": 0.0024275477645624125,
+    "activation": "celu",
+    "optimizer": "adamax",
+    "batch_size": 512,
+    "lstm_layers": 3,
+    "val_loss": 0.008295112289488316,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:31:47.624650",
+    "garage": "south_campus"
+  },
+  {
+    "lstm_neurons_list": [
+      362,
+      265
+    ],
+    "dropout": 0.29810375558557656,
+    "learning_rate": 0.002719048695513396,
+    "activation": "tanh",
+    "optimizer": "adam",
+    "batch_size": 512,
+    "lstm_layers": 2,
+    "val_loss": 0.008559933863580227,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:31:47.624650",
+    "garage": "south_campus"
+  },
+  {
+    "lstm_neurons_list": [
+      336,
+      265
+    ],
+    "dropout": 0.29810375558557656,
+    "learning_rate": 0.0008825883592364456,
+    "activation": "hard_tanh",
+    "optimizer": "adam",
+    "batch_size": 512,
+    "lstm_layers": 1,
+    "val_loss": 0.00866543035954237,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:31:47.624650",
+    "garage": "south_campus"
+  },
+  {
+    "lstm_neurons_list": [
+      345
+    ],
+    "dropout": 0.2256554662010276,
+    "learning_rate": 0.0013646745406907337,
+    "activation": "hard_tanh",
+    "optimizer": "adam",
+    "batch_size": 256,
+    "lstm_layers": 1,
+    "val_loss": 0.011071540415287018,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:31:47.624650",
+    "garage": "south_campus"
+  },
+  {
+    "lstm_neurons_list": [
+      295,
+      375,
+      306
+    ],
+    "dropout": 0.44221200343415235,
+    "learning_rate": 0.0024275477645624125,
+    "activation": "celu",
+    "optimizer": "adamax",
+    "batch_size": 512,
+    "lstm_layers": 3,
+    "val_loss": 0.0141105642542243,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:31:47.624650",
+    "garage": "south_campus"
+  },
+  {
+    "lstm_neurons_list": [
+      318,
+      352,
+      163
+    ],
+    "dropout": 0.2256554662010276,
+    "learning_rate": 0.0013646745406907337,
+    "activation": "hard_sigmoid",
+    "optimizer": "adamax",
+    "batch_size": 256,
+    "lstm_layers": 3,
+    "val_loss": 0.01656477525830269,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:31:47.624650",
+    "garage": "south_campus"
+  },
+  {
+    "lstm_neurons_list": [
+      299,
+      398,
+      449
+    ],
+    "dropout": 0.6459692364722854,
+    "learning_rate": 0.00047238924298885195,
+    "activation": "hard_tanh",
+    "optimizer": "adam",
+    "batch_size": 1024,
+    "lstm_layers": 3,
+    "val_loss": 0.01858562044799328,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:31:47.624650",
+    "garage": "south_campus"
+  },
+  {
+    "lstm_neurons_list": [
+      295,
+      375,
+      306
+    ],
+    "dropout": 0.6459692364722854,
+    "learning_rate": 0.0024275477645624125,
+    "activation": "celu",
+    "optimizer": "nadam",
+    "batch_size": 512,
+    "lstm_layers": 3,
+    "val_loss": 0.026436785236001015,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:31:47.624650",
+    "garage": "south_campus"
+  },
+  {
+    "lstm_neurons_list": [
+      113
+    ],
+    "dropout": 0.299154508403407,
+    "learning_rate": 0.002344981525700762,
+    "activation": "tanh",
+    "optimizer": "rmsprop",
+    "batch_size": 256,
+    "lstm_layers": 1,
+    "val_loss": 0.006864116061478853,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:56:05.022643",
+    "garage": "south_campus"
+  },
+  {
+    "lstm_neurons_list": [
+      113,
+      328
+    ],
+    "dropout": 0.299154508403407,
+    "learning_rate": 0.002344981525700762,
+    "activation": "tanh",
+    "optimizer": "rmsprop",
+    "batch_size": 256,
+    "lstm_layers": 2,
+    "val_loss": 0.007550150156021118,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:56:05.022643",
+    "garage": "south_campus"
+  },
+  {
+    "lstm_neurons_list": [
+      113,
+      328
+    ],
+    "dropout": 0.299154508403407,
+    "learning_rate": 0.002344981525700762,
+    "activation": "tanh",
+    "optimizer": "rmsprop",
+    "batch_size": 256,
+    "lstm_layers": 2,
+    "val_loss": 0.00935268308967352,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:56:05.022643",
+    "garage": "south_campus"
+  },
+  {
+    "lstm_neurons_list": [
+      113,
+      328
+    ],
+    "dropout": 0.299154508403407,
+    "learning_rate": 0.002344981525700762,
+    "activation": "tanh",
+    "optimizer": "rmsprop",
+    "batch_size": 256,
+    "lstm_layers": 2,
+    "val_loss": 0.015991056337952614,
+    "generation": 0,
+    "finished_time": "2025-09-19T09:56:05.022643",
+    "garage": "south_campus"
+  }
+]

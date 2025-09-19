@@ -1,20 +1,17 @@
-import os
 import sys
+import os
 from pathlib import Path
 
 # Add the project root to Python path
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
 
-
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler
 from datetime import datetime
 from pymongo import MongoClient
 from dotenv import load_dotenv
 import sqlite3
-import time
 
 from data.forecasting.constants import (
         LOGS_DIRECTORY,
@@ -23,8 +20,7 @@ from data.forecasting.constants import (
 
 pd.set_option('future.no_silent_downcasting', True)
 load_dotenv()
-MONGO_URI = "mongodb+srv://parkinguser:jD5FIKDmS9M0NwZ9@cluster0.5zq6e3z.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-
+MONGO_URI = os.getenv("MONGO_URI")  # <-- Use value from .env file
 
 # Function to establish a connection to the SQLite database
 def get_db_connection():
@@ -167,10 +163,8 @@ def load_data_from_mongodb(forecast_start: datetime, limit: int = 100000, resamp
 
     return df_resampled
 
-# --- Plotting function for resampled data ---
-import matplotlib.pyplot as plt
-
 def plot_mongo_data(df):
+    import matplotlib.pyplot as plt
     plt.figure(figsize=(15, 6))
     for col in ["South_status", "West_status", "North_status", "SouthCampus_status"]:
         plt.plot(df['date'], df[col], label=col)
@@ -219,7 +213,7 @@ def add_instruction_days(data: pd.DataFrame) -> pd.DataFrame:
     data['time_until_next_non_instruction'] = data['time_until_next_non_instruction'].fillna(0)
     return data
 
-#cyclical time encodings
+# cyclical time encodings
 # Prepare data for long-term model (includes time encoding features)
 def add_cyclical_time_encoding(data: pd.DataFrame) -> pd.DataFrame:
     ts: pd.Series = data['date']
