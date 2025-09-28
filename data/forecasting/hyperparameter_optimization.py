@@ -1,15 +1,17 @@
-import random
-import numpy as np
-import pandas as pd
 import sys
-import matplotlib.pyplot as plt
-import tensorflow as tf
 import gc
 import os
 import json
+import random
+import multiprocessing 
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import tensorflow as tf
 from datetime import datetime
 from pathlib import Path
 from typing import List, Any, Dict
+from multiprocessing import Manager
 
 # Suppress TensorFlow logs
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -21,52 +23,61 @@ sys.path.append(str(project_root))
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="keras.saving")
 
-from data.forecasting.keras_model_file import build_model
-from data.forecasting.long_term_model import train_long_model_with_generator
-from data.forecasting.data_functions import add_cyclical_time_encoding, add_event_impact_features,add_instruction_days, load_data_from_mongodb
+from data.forecasting.data_functions import load_data_from_mongodb
 from data.forecasting.constants import (
-    GARAGE_NAMES,
-    LONG_SEQ,
-    LONG_FUTURE_STEPS,
+
     ENABLE_TIME_ENCODING,
     ENABLE_INSTR_DAY,
-    ENABLE_EVENT_ENCODING
+    ENABLE_EVENT_ENCODING,
+    GENETIC_LOG
 )
+
+
+# Genetic algorithm parameters
+POPULATION_SIZE = 128 # Number of individuals in the population
+GENERATIONS = 25 # Number of generations to evolve
+ELITES_SIZE = 4 # Number of top individuals to carry over unchanged to the next generation
+NEW_INDIVIDUALS_PER_GEN_RATIO = 0.1  # Ratio of completely random individuals to children of last generation, 0 for none
+ADAPTIVE_CROSSOVER_RATE = 0.7
+INITIAL_MUTATION_RATE = 0.5
+FINAL_MUTATION_RATE = 0.05
+POPS_PER_TORNAMENT = 4  # Number of individuals competing in each tournament
+
+# Run parameters
+TEST_SPLIT = 0.975
+TRAINING_EPOCHS = 50 
+
+# other parameters
+MULTIPROCESSING_MAX_PROCESSES = 6  # Max number of parallel processes for fitness evaluation
 
 # Update the search space for hyperparameters
 HYPERPARAMETER_SPACE = {
     "lstm_neurons_list": range(16, 512, 1),
-    "lstm_layers": [1, 2, 3, 4, 5],
+    "lstm_layers": [1, 2, 3, 4, 5, 6],
     "dropout": (0.05, 0.9),
-    "learning_rate": (1e-4, 5e-3),
-    "activation": ["tanh", "hard_tanh", "celu", "elu", "sigmoid", "hard_sigmoid"],
-    "optimizer": ["nadam", "adam", "rmsprop", "lion", "adamax"],
-    "batch_size": [256, 512, 1024]
+    "learning_rate": (1e-5, 1e-3),
+    "activation": [ "celu", "elu", "gelu", "hard_sigmoid", "hard_tanh", "hard_silu","leaky_relu", "linear", "mish", "relu", "silu"],
+    "optimizer": ["nadam", "adam", "rmsprop", "lion", "adamax", "adamw"],
+    "batch_size": [256, 512, 1024, 2048]
 }
 
+# pre-define good starting pops
 starting_pops = [
     # # South
-    # {'lstm_neurons_list': [77, 73, 205, 216], 'lstm_layers': 4, 'dropout': 0.2500845427465502, 'learning_rate': 0.0018339163857906118, 'activation': 'tanh', 'optimizer': 'adamax', 'batch_size': 512, 'Loss': 0.00402255542576133},
-    # {'lstm_neurons_list': [114, 170, 429, 412], 'lstm_layers': 4, 'dropout': 0.39671304557770519, 'learning_rate': 0.0033710608358507514, 'activation': 'sigmoid', 'optimizer': 'rmsprop', 'batch_size': 1024, 'Loss': 0.004722285505342086},
+    # {'lstm_neurons_list': [198, 345, 251, 367], 'dropout': 0.2604909306814078, 'learning_rate': 0.00019687721787212608, 'activation': 'hard_tanh', 'optimizer': 'nadam', 'batch_size': 512, 'lstm_layers': 4}, #Loss: 0.001492829411290586
+    # {'lstm_neurons_list': [349, 209, 405, 276], 'dropout': 0.21966249523451964, 'learning_rate': 0.0001149133286221292, 'activation': 'celu', 'optimizer': 'lion', 'batch_size': 256, 'lstm_layers': 3}, # Loss: 0.001130951102823019
+    # {'lstm_neurons_list': [511, 236, 260], 'dropout': 0.46926611139688446, 'learning_rate': 0.003780982030266334, 'activation': 'sigmoid', 'optimizer': 'nadam', 'batch_size': 1024, 'lstm_layers': 3}, # Loss: 0.0016010220861062407
+    # {'lstm_neurons_list': [144, 303, 428, 369], 'dropout': 0.2717238359847232, 'learning_rate': 0.0010100765283741343, 'activation': 'hard_tanh', 'optimizer': 'adamax', 'batch_size': 512, 'lstm_layers': 3}, Loss: 0.0025257107336074114
     # # West
-    # {'lstm_neurons_list': [110, 183, 207, 508], 'lstm_layers': 4, 'dropout': 0.44826529785781433, 'learning_rate': 0.0004833113226494442, 'activation': 'sigmoid', 'optimizer': 'adam', 'batch_size': 256, 'Loss': 0.001618490084335208},
-    # {'lstm_neurons_list': [112, 232, 229, 471], 'lstm_layers': 4, 'dropout': 0.40284652978581433, 'learning_rate': 0.0005810818127695974, 'activation': 'sigmoid', 'optimizer': 'lion', 'batch_size': 256, 'Loss': 0.0017113440755973635},
+    # {'lstm_neurons_list': [141, 499, 448], 'dropout': 0.45827972302256537, 'learning_rate': 0.0039749877186755975, 'activation': 'sigmoid', 'optimizer': 'nadam', 'batch_size': 512, 'lstm_layers': 3}, # Loss: 0.0013190264580771327
+    # {'lstm_neurons_list': [150, 105, 289, 329, 474], 'dropout': 0.6090342302354329, 'learning_rate': 0.0003940610980452166, 'activation': 'hard_sigmoid', 'optimizer': 'adam', 'batch_size': 512, 'lstm_layers': 5}, Loss: 0.0010854111751541495
     # # South Campus
-    # {'lstm_neurons_list': [141, 258, 327, 245, 275], 'lstm_layers': 5, 'dropout': 0.15608111088723042, 'learning_rate': 0.000649410048921348, 'activation': 'gelu', 'optimizer': 'rmsprop', 'batch_size': 256, 'Loss': 0.006575405358216176},
-    # {'lstm_neurons_list': [180, 104, 508, 253], 'lstm_layers': 4, 'dropout': 0.3651523846670196, 'learning_rate': 0.002592602448410859, 'activation': 'leaky_relu', 'optimizer': 'rmsprop', 'batch_size': 256, 'Loss': 0.006179669469593977},
-    # {'lstm_neurons_list': [112, 232, 346, 443], 'lstm_layers': 4, 'dropout': 0.40284652978581433, 'learning_rate': 0.001867326325308185, 'activation': 'leaky_relu', 'optimizer': 'rmsprop', 'batch_size': 256, 'Loss': 0.00690326185325325},
-    # {'lstm_neurons_list': [110, 180, 508, 253], 'lstm_layers': 4, 'dropout': 0.3651523846670196, 'learning_rate': 0.002592602448410859, 'activation': 'celu', 'optimizer': 'adamw', 'batch_size': 1024, 'Loss': 0.00729},
+    # {'lstm_neurons_list': [342, 511], 'dropout': 0.4051419432780984, 'learning_rate': 0.00020582730403405803, 'activation': 'silu', 'optimizer': 'lion', 'batch_size': 256, 'lstm_layers': 2}, # Loss: 0.004495117347687483
+    # {'lstm_neurons_list': [129, 123, 413, 421, 456], 'dropout': 0.3690355975090591, 'learning_rate': 0.0021108835847791053, 'activation': 'linear', 'optimizer': 'adamax', 'batch_size': 1024, 'lstm_layers': 5}, # Loss: 0.004978095181286335 w/o t
+    # {'lstm_neurons_list': [73, 212, 338, 489], 'dropout': 0.5633597438239422, 'learning_rate': 0.0024480537376972418, 'activation': 'celu', 'optimizer': 'nadam', 'batch_size': 256, 'lstm_layers': 4}, # Loss: 0.0028183283284306526 
     # # North
-    # {'lstm_neurons_list': [423, 176, 436, 325], 'lstm_layers': 4, 'dropout': 0.5745106585317661, 'learning_rate': 0.001605169386433909, 'activation': 'sigmoid', 'optimizer': 'adam', 'batch_size': 256, 'Loss': 0.0002168411923235003},
-    # {'lstm_neurons_list': [424, 210, 324, 431], 'lstm_layers': 4, 'dropout': 0.5745106585317661, 'learning_rate': 0.001605169386433909, 'activation': 'sigmoid', 'optimizer': 'adam', 'batch_size': 256, 'Loss': 0.00020756182103530536},
-    # {'lstm_neurons_list': [327, 179, 417, 317], 'lstm_layers': 4, 'dropout': 0.5745106585317661, 'learning_rate': 0.0009967926629038712, 'activation': 'sigmoid', 'optimizer': 'adamw', 'batch_size': 256, 'Loss': 0.0018771779723465443}
+    # {'lstm_neurons_list': [345, 361, 393, 423], 'dropout': 0.5877143299073334, 'learning_rate': 0.0019881450310899862, 'activation': 'sigmoid', 'optimizer': 'nadam', 'batch_size': 512, 'lstm_layers': 4}, # Loss: 0.0016761806327849627
 ]
-
-# Genetic algorithm parameters
-POPULATION_SIZE = 4
-GENERATIONS = 50
-MUTATION_RATE = 0.8
-ELITES_SIZE = 1
 
 # Define global variable for extra_long_data
 EXTRA_LONG_DATA = 0
@@ -76,7 +87,6 @@ if ENABLE_TIME_ENCODING:
     EXTRA_LONG_DATA += 10
 if ENABLE_EVENT_ENCODING:
     EXTRA_LONG_DATA += 4
-
 
 def initialize_population() -> List[Dict[str, Any]]:
     """Randomly initialize the population."""
@@ -103,8 +113,13 @@ def initialize_population() -> List[Dict[str, Any]]:
     return population
 
 
-def evaluate_fitness(individual: Dict[str, Any], garage: str, data: np.ndarray) -> float:
-    """Evaluate the fitness of an individual by training a model and returning the validation loss."""
+# Update evaluate_fitness_worker to directly return the loss instead of using a queue
+def evaluate_fitness_worker(individual, garage, data):
+    import tensorflow as tf
+    from data.forecasting.keras_model_file import build_model
+    from data.forecasting.long_term_model import train_long_model_with_generator
+    from data.forecasting.constants import GARAGE_NAMES, LONG_SEQ, LONG_FUTURE_STEPS
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
     # Ensure lstm_neurons_list is always a list
     if isinstance(individual["lstm_neurons_list"], int):
         individual["lstm_neurons_list"] = [individual["lstm_neurons_list"]]
@@ -115,7 +130,8 @@ def evaluate_fitness(individual: Dict[str, Any], garage: str, data: np.ndarray) 
         print(f"  {key}: {value}")
 
     # Select optimizer
-    if   individual["optimizer"] == "adam":
+    optimizer = None
+    if individual["optimizer"] == "adam":
         optimizer = tf.keras.optimizers.Adam(learning_rate=individual["learning_rate"])
     elif individual["optimizer"] == "adamw":
         optimizer = tf.keras.optimizers.AdamW(learning_rate=individual["learning_rate"])
@@ -127,51 +143,107 @@ def evaluate_fitness(individual: Dict[str, Any], garage: str, data: np.ndarray) 
         optimizer = tf.keras.optimizers.Lion(learning_rate=individual["learning_rate"])
     elif individual["optimizer"] == "adamax":
         optimizer = tf.keras.optimizers.Adamax(learning_rate=individual["learning_rate"])
+    elif individual["optimizer"] == "adadelta":
+        optimizer = tf.keras.optimizers.Adadelta(learning_rate=individual["learning_rate"])
 
     model = build_model(
         lstm_neurons_list=individual["lstm_neurons_list"],
         dropout=individual["dropout"],
         seq_size=LONG_SEQ,
         activation=individual["activation"],
-        n_feature= 4 + EXTRA_LONG_DATA,
+        n_feature=4 + EXTRA_LONG_DATA,
         future_steps=LONG_FUTURE_STEPS,
         garage_no=GARAGE_NAMES.index(garage),
-        optimizer=optimizer
-    )
+        optimizer=optimizer)
 
     # Train the model and get the validation loss
-    val_loss = train_long_model_with_generator(
-        model=model,
-        batch_size=individual["batch_size"],
-        future_steps=LONG_FUTURE_STEPS,
-        test_split=0.98,
-        seq_size=LONG_SEQ,
-        name=f"temp_model_{garage}",
-        training_epochs=25,
-        data=data
-    )
+    try:
+        val_loss = train_long_model_with_generator(
+            model=model,
+            batch_size=individual["batch_size"],
+            future_steps=LONG_FUTURE_STEPS,
+            test_split=TEST_SPLIT,
+            seq_size=LONG_SEQ,
+            name=f"temp_model_{garage}",
+            training_epochs=TRAINING_EPOCHS,
+            data=data)
+    except Exception as e:
+        print(f"Error during training: {e}")
+        return float('inf')  # Assign a high loss to indicate failure
 
-    # Clear session and collect garbage
-    tf.keras.backend.clear_session()
-    del model, optimizer
-    gc.collect()
+    return val_loss[0]
+
+
+# Update worker_process to use the new evaluate_fitness_worker
+def worker_process(individual, garage, data, results, index):
+    import tensorflow as tf
+    tf.config.optimizer.set_jit(True)  # Enable XLA JIT compilation
+    try:
+        val_loss = evaluate_fitness_worker(individual, garage, data)
+        results[index] = val_loss
+    except Exception as e:
+        print(f"Error in worker_process: {e}")
+        results[index] = float('inf')  # Assign a high loss to indicate failure
+
+# Update evaluate_fitness to use the new evaluate_fitness_worker
+def evaluate_fitness(individual: Dict[str, Any], garage: str, data: np.ndarray) -> float:
+    
+    # Create a multiprocessing context
+    ctx = multiprocessing.get_context("spawn")
+    manager = Manager()
+    results = manager.list([None])  # Shared list to store the result
+
+    # Start the worker process
+    process = ctx.Process(target=worker_process, args=(individual, garage, data, results, 0))
+    process.start()
+    process.join(timeout=60)
+    if process.is_alive():
+        print(f"Process {process.pid} failed to terminate.")
+        process.terminate()
+
+    # Retrieve the validation loss from the shared list
+    val_loss = results[0]
+
     return val_loss
+
+
+def evaluate_fitness_parallel_v2(population: List[Dict[str, Any]], garage: str, data: np.ndarray) -> List[float]:
+    """Evaluate the fitness of the entire population in parallel using subprocesses with a limit on the number of active processes."""
+    ctx = multiprocessing.get_context("spawn")
+    manager = Manager()
+    results = manager.list([None] * len(population))  # Shared list to store results
+    processes = []
+
+    for index, individual in enumerate(population):
+        # Wait for an available slot if the number of active processes reaches the limit
+        while len([p for p in processes if p.is_alive()]) >= MULTIPROCESSING_MAX_PROCESSES:
+            for process in processes:
+                if not process.is_alive():
+                    process.join()  # Ensure completed processes are joined
+
+        # Start a new process
+        process = ctx.Process(target=worker_process, args=(individual, garage, data, results, index))
+        processes.append(process)
+        process.start()
+
+    # Ensure all processes are joined after starting
+    for process in processes:
+        process.join()
+
+    return list(results)
 
 
 # Select parents using tournament selection
 def select_parents(population: List[Dict[str, Any]], fitness_scores: List[float]) -> List[Dict[str, Any]]:
-    """Select individuals based on their fitness scores using tournament selection."""
     selected = []
     for _ in range(POPULATION_SIZE // 2):
-        tournament = random.sample(list(zip(population, fitness_scores)), k=4)
+        tournament = random.sample(list(zip(population, fitness_scores)), k=POPS_PER_TORNAMENT)
         winner = min(tournament, key=lambda x: x[1])  # Select the individual with the lowest loss
         selected.append(winner[0])
     return selected
 
-
-# Perform intelligent crossover between two parents
+# Perform crossover between two parents
 def crossover(parent1: Dict[str, Any], parent2: Dict[str, Any]) -> Dict[str, Any]:
-    """Perform intelligent crossover between two parents to produce an offspring (average neurons, clamp to bounds)."""
     offspring = {}
     for key in parent1.keys():
         if key == "lstm_neurons_list":
@@ -226,7 +298,6 @@ def crossover(parent1: Dict[str, Any], parent2: Dict[str, Any]) -> Dict[str, Any
 
 # Mutate an individual
 def mutate(individual: Dict[str, Any], mutation_rate: float = 0.5) -> Dict[str, Any]:
-    """Mutate an individual by randomly changing one of its hyperparameters (mutation rate controls change size)."""
     if random.random() < mutation_rate:
         key = random.choice(list(HYPERPARAMETER_SPACE.keys()))
         if key == "lstm_neurons_list":
@@ -234,7 +305,7 @@ def mutate(individual: Dict[str, Any], mutation_rate: float = 0.5) -> Dict[str, 
             new_layers = []
             for n in individual[key]:
                 # Change by +/- (10% to 50%) depending on mutation rate
-                max_change = 0.1 + 0.4 * mutation_rate
+                max_change = 0.4 * mutation_rate
                 delta = int(n * random.uniform(-max_change, max_change))
                 new_n = max(min_n, min(max_n, n + delta))
                 new_layers.append(new_n)
@@ -243,14 +314,14 @@ def mutate(individual: Dict[str, Any], mutation_rate: float = 0.5) -> Dict[str, 
         elif key == "dropout":
             val = individual[key]
             min_d, max_d = HYPERPARAMETER_SPACE["dropout"]
-            max_change = 0.1 + 0.4 * mutation_rate
+            max_change = 0.4 * mutation_rate
             delta = val * random.uniform(-max_change, max_change)
             new_val = max(min_d, min(max_d, val + delta))
             individual[key] = new_val
         elif key == "learning_rate":
             val = individual[key]
             min_lr, max_lr = HYPERPARAMETER_SPACE["learning_rate"]
-            max_change = 0.1 + 0.4 * mutation_rate
+            max_change = 0.4 * mutation_rate
             delta = val * random.uniform(-max_change, max_change)
             new_val = max(min_lr, min(max_lr, val + delta))
             individual[key] = new_val
@@ -274,21 +345,12 @@ def mutate(individual: Dict[str, Any], mutation_rate: float = 0.5) -> Dict[str, 
             individual[key] = val
     return individual
 
-
-def calculate_diversity(population: List[Dict[str, Any]]) -> float:
-    """Calculate diversity of the population based on hyperparameter differences."""
-    diversity = 0
-    for i, ind1 in enumerate(population):
-        for j, ind2 in enumerate(population):
-            if i < j:
-                diversity += sum(1 for key in ind1 if ind1[key] != ind2[key])
-    return diversity / (len(population) * (len(population) - 1) / 2)
-
+# Main genetic algorithm function
 def genetic_algorithm(garage: str, data: np.ndarray):
     """Run the genetic algorithm to optimize hyperparameters for a specific garage and save population hyperparameters for each generation."""
 
     # Clear the best models file at the start of a new run
-    with open(f"{garage}_best_models.txt", "w") as f:
+    with open(f"{GENETIC_LOG}/best_model_{garage_name}.txt", "w") as f:
         f.write("Best Models per Generation\n")
 
     population = initialize_population()
@@ -299,57 +361,63 @@ def genetic_algorithm(garage: str, data: np.ndarray):
     elite_losses = []  # Store their losses
 
     # Adaptive crossover rate based on fitness
-    ADAPTIVE_CROSSOVER_RATE = 0.7
-
-    initial_mutation_rate = 0.8
-    final_mutation_rate = 0.1
-    mutation_decay = (initial_mutation_rate - final_mutation_rate) / GENERATIONS
+    mutation_decay = (INITIAL_MUTATION_RATE - FINAL_MUTATION_RATE) / GENERATIONS
 
     for generation in range(GENERATIONS):
         print(f"Generation {generation + 1}")
         # Simulated annealing: decrease mutation rate over time
-        mutation_rate = max(final_mutation_rate, initial_mutation_rate - mutation_decay * generation)
+        mutation_rate = max(FINAL_MUTATION_RATE, INITIAL_MUTATION_RATE - mutation_decay * generation)
 
         # Evaluate fitness for the population serially
-        fitness_scores = [evaluate_fitness(ind, garage, data)[0] for ind in population]
+        fitness_scores = evaluate_fitness_parallel_v2(population, garage, data)
+
+        # Remove any individuals with non-float fitness scores
+        valid_population_scores = [(ind, score) for ind, score in zip(population, fitness_scores) if isinstance(score, float)]
 
         # Sort population by fitness
-        sorted_population_scores = sorted(zip(population, fitness_scores), key=lambda x: x[1])
+        sorted_population_scores = sorted(valid_population_scores, key=lambda x: x[1])
         population = [ind for ind, score in sorted_population_scores]
         fitness_scores = [score for ind, score in sorted_population_scores]
 
         # Update elites: keep only the best ELITES_SIZE models ever seen
-        for ind, loss in zip(population, fitness_scores):
-            if len(elites) < ELITES_SIZE:
-                elites.append(ind)
-                elite_losses.append(loss)
-            else:
-                # If this model is better than the worst elite, replace it
-                worst_elite_idx = elite_losses.index(max(elite_losses))
-                if loss < elite_losses[worst_elite_idx]:
-                    elites[worst_elite_idx] = ind
-                    elite_losses[worst_elite_idx] = loss
+        if ELITES_SIZE > 0:
+            for ind, loss in zip(population, fitness_scores):
+                if len(elites) < ELITES_SIZE:
+                    elites.append(ind)
+                    elite_losses.append(loss)
+                else:
+                    # If this model is better than the worst elite, replace it
+                    worst_elite_idx = elite_losses.index(max(elite_losses))
+                    if loss < elite_losses[worst_elite_idx]:
+                        elites[worst_elite_idx] = ind
+                        elite_losses[worst_elite_idx] = loss
 
-        # Select parents (include current elites)
-        selected_parents = select_parents(population, fitness_scores) + elites
-
+        # Select parents (include current elites if any)
+        if ELITES_SIZE > 0:
+            selected_parents = select_parents(population, fitness_scores) + elites
+        else:
+            selected_parents = select_parents(population, fitness_scores)
+        
+        # -- NEXT GENERATION --
         next_generation = []
+
         # Add completely random individuals to maintain diversity
-        num_random_individuals = POPULATION_SIZE // 5  # Add a percent of the population as random individuals
-        for _ in range(num_random_individuals):
-            layers = random.choice(HYPERPARAMETER_SPACE["lstm_layers"])
-            neuron_layers = [random.choice(HYPERPARAMETER_SPACE["lstm_neurons_list"]) for _ in range(layers)]
-            batch_size = random.choice(HYPERPARAMETER_SPACE["batch_size"])
-            random_individual = {
-                "lstm_neurons_list": neuron_layers,
-                "dropout": random.uniform(*HYPERPARAMETER_SPACE["dropout"]),
-                "learning_rate": random.uniform(*HYPERPARAMETER_SPACE["learning_rate"]),
-                "activation": random.choice(HYPERPARAMETER_SPACE["activation"]),
-                "optimizer": random.choice(HYPERPARAMETER_SPACE["optimizer"]),
-                "batch_size": batch_size,
-                "lstm_layers": layers,
-            }
-            next_generation.append(random_individual)
+        if NEW_INDIVIDUALS_PER_GEN_RATIO != 0:
+            num_random_individuals = int(POPULATION_SIZE // (1/NEW_INDIVIDUALS_PER_GEN_RATIO))
+            for _ in range(num_random_individuals):
+                layers = random.choice(HYPERPARAMETER_SPACE["lstm_layers"])
+                neuron_layers = [random.choice(HYPERPARAMETER_SPACE["lstm_neurons_list"]) for _ in range(layers)]
+                batch_size = random.choice(HYPERPARAMETER_SPACE["batch_size"])
+                random_individual = {
+                    "lstm_neurons_list": neuron_layers,
+                    "dropout": random.uniform(*HYPERPARAMETER_SPACE["dropout"]),
+                    "learning_rate": random.uniform(*HYPERPARAMETER_SPACE["learning_rate"]),
+                    "activation": random.choice(HYPERPARAMETER_SPACE["activation"]),
+                    "optimizer": random.choice(HYPERPARAMETER_SPACE["optimizer"]),
+                    "batch_size": batch_size,
+                    "lstm_layers": layers,
+                }
+                next_generation.append(random_individual)
 
         while len(next_generation) < POPULATION_SIZE:
             parent1, parent2 = random.sample(selected_parents, 2)
@@ -375,7 +443,7 @@ def genetic_algorithm(garage: str, data: np.ndarray):
         lowest_val_losses.append(best_loss)
 
         # Log the best model and its loss to a text file
-        with open(f"{garage}_best_models.txt", "a") as f:
+        with open(f"{GENETIC_LOG}/best_model_{garage_name}.txt", "a") as f:
             f.write(f"Generation {generation + 1}: {best_model}, Loss: {best_loss}\n")
 
         # Append each model's hyperparameters and val_loss to a persistent database file
@@ -399,8 +467,11 @@ def genetic_algorithm(garage: str, data: np.ndarray):
             history.append(entry)
 
         # Save updated history
-        with open(history_path, "w") as f:
-            json.dump(history, f, indent=2)
+        try:
+            with open(history_path, "w") as f:
+                json.dump(history, f, indent=2)
+        except Exception as e:
+            print(f"Error writing to history file: {e}")
 
         # Plot average and lowest validation loss per generation (updated every generation)
         plt.figure(figsize=(12, 6))
@@ -411,7 +482,7 @@ def genetic_algorithm(garage: str, data: np.ndarray):
         plt.ylabel("Validation Loss")
         plt.legend()
         plt.grid(True)
-        plt.savefig(f"{garage}_validation_loss_per_generation.png")
+        plt.savefig(f"{GENETIC_LOG}/generation_{garage_name}.svg")
         plt.close()
 
         # Clear TensorFlow session and collect garbage to prevent memory leaks
@@ -419,16 +490,17 @@ def genetic_algorithm(garage: str, data: np.ndarray):
         gc.collect()
 
     # Return the best individual from the final generation
-    # Now, best individual is the best elite
-    best_elite_idx = elite_losses.index(min(elite_losses))
-    best_individual = elites[best_elite_idx]
+    if ELITES_SIZE > 0 and elites:
+        best_elite_idx = elite_losses.index(min(elite_losses))
+        best_individual = elites[best_elite_idx]
+    else:
+        best_individual = best_models[-1]
     print("Best hyperparameters:", best_individual)
     return best_individual
 
 # Example usage
 if __name__ == "__main__":
-    garage_name = "south"  # Example garage
+    garage_name = "south_campus"  # Example garage
     data: pd.DataFrame = load_data_from_mongodb(datetime.now())
-
     best_hyperparameters = genetic_algorithm(garage_name, data)
     print("Optimized hyperparameters:", best_hyperparameters)

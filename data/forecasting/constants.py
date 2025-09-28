@@ -8,6 +8,7 @@ DATA_DIR = Path(__file__).resolve().parent.parent # -> Forecasting -> data
 LOGS_DIRECTORY = DATA_DIR / "records"
 MODEL_DIRECTORY = DATA_DIR / "forecasting" / "keras_models"
 EVENTS_DIRECTORY = DATA_DIR / "events"
+GENETIC_LOG = DATA_DIR / "genetic_logs"
 
 # ── CONSTANTS ───────────────────────────────────────────────────────────────────
 GARAGE_NAMES = ["south", "west", "north", "south_campus"]
@@ -15,12 +16,12 @@ GARAGE_NAMES = ["south", "west", "north", "south_campus"]
 
 # ── TRAINING CONSTANTS ───────────────────────────────────────────────────────────
 # Define parameters for long model
-LONG_SEQ = 1
+LONG_SEQ = 4
 LONG_FUTURE_STEPS = 288
 
 # Define parameters for short model
 SHORT_SEQ = 16
-SHORT_FUTURE_STEPS = 16
+SHORT_FUTURE_STEPS = 3
 
 ENABLE_TIME_ENCODING: bool          = True
 ENABLE_INSTR_DAY: bool              = True

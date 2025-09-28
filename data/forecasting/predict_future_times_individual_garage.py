@@ -22,8 +22,8 @@ import matplotlib.pyplot as plt
 try:
     from data.forecasting.keras_model_file import build_model
     from data.forecasting.short_term_model import train_short_model
-    from data.forecasting.long_term_model import train_long_model
-    from data.forecasting.data_functions import add_cyclical_time_encoding, add_event_impact_features,add_instruction_days, load_data_from_mongodb, export_db_to_csv
+    from data.forecasting.long_term_model import train_long_model_with_generator, train_long_model
+    from data.forecasting.data_functions import add_cyclical_time_encoding, add_event_impact_features,add_instruction_days, load_data_from_mongodb
     from data.forecasting import utils
     from data.forecasting.constants import (
         MODEL_DIRECTORY,
@@ -40,11 +40,11 @@ except ImportError:
     # Fall back to local imports if the full path imports fail
     from keras_model_file import build_model
     from short_term_model import train_short_model
-    from long_term_model import train_long_model
+    from long_term_model import train_long_model_with_generator, train_long_model
+    from data_functions import add_cyclical_time_encoding, add_event_impact_features,add_instruction_days, load_data_from_mongodb
     import utils
     from constants import (
         MODEL_DIRECTORY,
-        LOGS_DIRECTORY,
         GARAGE_NAMES,
         LONG_SEQ,
         LONG_FUTURE_STEPS,
@@ -55,37 +55,37 @@ except ImportError:
         ENABLE_EVENT_ENCODING
     )
 # control flags  [True,True,True,True] [False,False,False,False] (for easy copy paste)
-LONG_TRAINING_MASK: List[bool]      = [False,True,True,True]
+LONG_TRAINING_MASK: List[bool]      = [True,False,False,False]
 SHORT_TRAINING_MASK: List[bool]     = [False,False,False,False]
 
 LONG_HYPER_PARAMS: Dict[str, Dict[str, Any]] = {
-    "south":        {'lstm_neurons_list': [77, 73, 205, 216], 'lstm_layers': 4, 'dropout': 0.2500845427465502, 'learning_rate': 0.0018339163857906118, 'activation': 'tanh', 'optimizer': 'adamax', 'batch_size': 512},
-    "west":         {'lstm_neurons_list': [110, 183, 207, 508], 'lstm_layers': 4, 'dropout': 0.44826529785781433, 'learning_rate': 0.0004833113226494442, 'activation': 'sigmoid', 'optimizer': 'adam', 'batch_size': 256},
-    "north":        {'lstm_neurons_list': [327, 179, 417, 317], 'lstm_layers': 4, 'dropout': 0.5745106585317661, 'learning_rate': 0.0009967926629038712, 'activation': 'sigmoid', 'optimizer': 'adamw', 'batch_size': 256},
-    "south_campus": {'lstm_neurons_list': [32, 192, 312], 'dropout': 0.4, 'learning_rate': 0.002, 'activation': 'hard_tanh', 'optimizer': 'rmsprop', 'batch_size': 128},
+    "south":        {'lstm_neurons_list': [511, 236, 260], 'dropout': 0.46926611139688446, 'learning_rate': 0.003780982030266334, 'activation': 'hard_sigmoid', 'optimizer': 'nadam', 'batch_size': 1024, 'lstm_layers': 3},
+    "west":         {'lstm_neurons_list': [141, 499, 448], 'dropout': 0.45827972302256537, 'learning_rate': 0.0039749877186755975, 'activation': 'hard_sigmoid', 'optimizer': 'nadam', 'batch_size': 512, 'lstm_layers': 3}, # Loss: 0.0013190264580771327,
+    "north":        {'lstm_neurons_list': [345, 361, 393, 423], 'dropout': 0.5877143299073334, 'learning_rate': 0.0019881450310899862, 'activation': 'hard_sigmoid', 'optimizer': 'nadam', 'batch_size': 512, 'lstm_layers': 4}, # Loss: 0.0016761806327849627
+    "south_campus": {'lstm_neurons_list': [73, 212, 338, 489], 'dropout': 0.5633597438239422, 'learning_rate': 0.0024480537376972418, 'activation': 'celu', 'optimizer': 'nadam', 'batch_size': 256, 'lstm_layers': 4}, # Loss: 0.0028183283284306526
 }
 
 SHORT_HYPER_PARAMS: Dict[str, Dict[str, Any]] = {
     "south": {
-        "lstm_neurons_list": [64, 16, 64],
-        "dropout": 0.10,
-        "learning_rate": 1e-3,
+        "lstm_neurons_list": [256],
+        "dropout": 0.50,
+        "learning_rate": 2e-3,
         "activation": "celu",},
     "west": {
-        "lstm_neurons_list": [64, 16, 64],
-        "dropout": 0.10,
-        "learning_rate": 1e-3,
+        "lstm_neurons_list": [256],
+        "dropout": 0.50,
+        "learning_rate": 2e-3,
         "activation": "celu",},
     "north": {
-        "lstm_neurons_list": [64, 16, 64],
-        "dropout": 0.10,
-        "learning_rate": 1e-3,
+        "lstm_neurons_list": [256],
+        "dropout": 0.50,
+        "learning_rate": 2e-3,
         "activation": "celu",},
     "south_campus": {
-        "lstm_neurons_list": [64, 16, 64],
-        "dropout": 0.10,
-        "learning_rate": 1e-3,
-        "activation": "celu",}
+        "lstm_neurons_list": [256],
+        "dropout": 0.50,
+        "learning_rate": 2e-3,
+        "activation": "celu",},
 }
 
 # long model hyperparameters
@@ -295,7 +295,7 @@ def calculate_prediction(forecast_start: datetime, hours: int = 24) -> List[floa
 
 if __name__ == "__main__":
     # values = calculate_prediction(datetime(year=2025,month=4,day=9,hour=6))
-    values = calculate_prediction(datetime.now()-dt.timedelta(days=2,hours=0))
+    values = calculate_prediction(datetime.now()-dt.timedelta(days=0,hours=0))
     print_string = ""
     for list in values:
         print_string += "\nGarage " + str(values.index(list)) + ": "

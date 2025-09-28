@@ -12,7 +12,7 @@ from datetime import datetime
 from pymongo import MongoClient
 from dotenv import load_dotenv
 import sqlite3
-
+from matplotlib import pyplot as plt
 from data.forecasting.constants import (
         LOGS_DIRECTORY,
         EVENTS_DIRECTORY 
@@ -160,7 +160,8 @@ def load_data_from_mongodb(forecast_start: datetime, limit: int = 100000, resamp
     df_resampled.rename(columns={'timestamp': 'date'}, inplace=True)
     print("\nData range (resampled):", df_resampled['date'].min(), "to", df_resampled['date'].max(), "\n")
     print("\n", df_resampled.head(), "\n")
-
+    client.close()
+    conn.close()
     return df_resampled
 
 def plot_mongo_data(df):
@@ -231,7 +232,7 @@ def add_cyclical_time_encoding(data: pd.DataFrame) -> pd.DataFrame:
 
 def add_event_impact_features(data: pd.DataFrame) -> pd.DataFrame:
     # Read event data and rename the event type column
-    events_df = pd.read_csv(EVENTS_DIRECTORY / "sjsu_home_games.csv", parse_dates=["Time"])
+    events_df = pd.read_csv(LOGS_DIRECTORY / "sjsu_home_games.csv", parse_dates=["Time"])
     events_df.rename(columns={"Sport": "event_type"}, inplace=True)
 
     # Ensure the forecast dates are in datetime and sort both dataframes (required for merge_asof)
@@ -270,6 +271,7 @@ def add_event_impact_features(data: pd.DataFrame) -> pd.DataFrame:
     data['time_since_event'] = data['time_since_event'].fillna(0)
 
     data.drop(columns=['upcoming_event_time', 'past_event_time'], inplace=True)
+    display_event_impact_features(data)
     return data
 
 def graph_instruction_day_encodings(data: pd.DataFrame):
@@ -292,7 +294,30 @@ def graph_instruction_day_encodings(data: pd.DataFrame):
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.show()
+    plt.savefig(f"{LOGS_DIRECTORY}/instruction_day_encodings.svg")
+
+def display_event_impact_features(data: pd.DataFrame):
+    """
+    Display the event impact features (time until next event and time since last event) for the dataset.
+
+    Parameters:
+        data (pd.DataFrame): DataFrame containing the dataset with event impact features.
+    """
+    if 'time_until_event' not in data.columns or 'time_since_event' not in data.columns:
+        print("Event impact features are not present in the dataset.")
+        return
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(data['date'], data['time_until_event'], label='Time Until Next Event', color='green')
+    plt.plot(data['date'], data['time_since_event'], label='Time Since Last Event', color='red')
+    plt.xlabel('Date')
+    plt.ylabel('Minutes')
+    plt.title('Event Impact Features Over Time')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(f"{LOGS_DIRECTORY}/event_impact_features.svg")
+    print(f"Event impact features graph saved to {LOGS_DIRECTORY}/event_impact_features.svg")
 
 def export_db_to_csv(output_path: str):
     """

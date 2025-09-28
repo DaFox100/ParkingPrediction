@@ -6,6 +6,8 @@ from tensorflow import keras
 from keras.losses import Loss
 from keras.callbacks import ModelCheckpoint
 
+import pandas as pd
+
 from data.forecasting.constants import MODEL_DIRECTORY
 
 physical_devices = tf.config.list_physical_devices('GPU')
@@ -45,28 +47,6 @@ class _CustomMSESingleGarage(Loss):
         total_error = error_under_100 + error_over_100
         return tf.reduce_mean(total_error)
 
-def _CustomMSEFour(y_true,y_pred):
-    y_true_slice = y_true[:, :, :4]
-    y_pred_slice = y_pred[:, :, :4]
-    return tf.reduce_mean(tf.square(y_true_slice - y_pred_slice))
-
-class CustomLossMultiPoint(Loss):
-    def __init__(self, weight_decay=0.1, name="custom_loss_multi_point"):
-        super().__init__(name=name)
-        self.weight_decay = weight_decay
-
-    def call(self, y_true, y_pred):
-        # Calculate the squared error for each time step
-        squared_errors = tf.square(y_true - y_pred)
-
-        # Apply a weighting factor that increases with the time step index
-        time_weights = tf.range(1, tf.shape(squared_errors)[1] + 1, dtype=tf.float32)
-        time_weights = tf.expand_dims(time_weights, axis=0)  # Match batch dimension
-        time_weights = tf.expand_dims(time_weights, axis=-1)  # Match feature dimension
-
-        # Weighted mean squared error
-        weighted_squared_errors = squared_errors * time_weights
-        return tf.reduce_mean(weighted_squared_errors)
 
 def build_model(
     lstm_neurons_list,
@@ -81,10 +61,22 @@ def build_model(
     inputs = keras.layers.Input(shape=(seq_size, n_feature))
     x = inputs
 
+    attention = keras.layers.Attention()([inputs, inputs])
+    x = keras.layers.Concatenate()([inputs, attention])
+
     for units in lstm_neurons_list:
+        shortcut = x  # Store the input as a shortcut for residual connection
         x = keras.layers.LSTM(units, return_sequences=True)(x)
         x = keras.layers.BatchNormalization()(x)
         x = keras.layers.Dropout(dropout)(x)
+
+        # Add residual connection (project shortcut if dimensions differ)
+        if shortcut.shape[-1] != x.shape[-1]:
+            shortcut = keras.layers.Dense(x.shape[-1])(shortcut)
+        x = keras.layers.Add()([x, shortcut])
+
+    # Added a TimeDistributed dense layer for additional feature extraction per timestep
+    x = keras.layers.TimeDistributed(keras.layers.Dense(32, activation='relu'))(x)
 
     x = keras.layers.Flatten()(x)
     outputs = keras.layers.Dense(future_steps * n_feature, activation=activation)(x)

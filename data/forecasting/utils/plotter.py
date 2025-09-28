@@ -61,8 +61,7 @@ def plot_prediction(
     plt.title("Actual vs. Smoothed Forecast with Adjusted Scaler Usage")
     plt.legend()
     plt.grid(True)
-    plt.show()
-    print("Plot shown here")
+    plt.savefig("plot.png")
 
     # If start_time and end_time are provided, extract hourly values for all garages
     if start_time is not None and end_time is not None:
